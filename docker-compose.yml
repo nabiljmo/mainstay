@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: aez
+      POSTGRES_PASSWORD: aez
+      POSTGRES_DB: aez
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aez"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build: ./api
+    environment:
+      AEZ_DATABASE_URL: postgresql://aez:aez@db:5432/aez
+      AEZ_REDIS_URL: redis://redis:6379/0
+      AEZ_WEATHER_CACHE_DIR: /weather-cache
+    volumes:
+      - weather-cache:/weather-cache
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  worker:
+    build: ./api
+    environment:
+      AEZ_DATABASE_URL: postgresql://aez:aez@db:5432/aez
+      AEZ_REDIS_URL: redis://redis:6379/0
+      AEZ_WEATHER_CACHE_DIR: /weather-cache
+    volumes:
+      - weather-cache:/weather-cache
+    depends_on:
+      redis:
+        condition: service_started
+    command: celery -A app.worker.celery_app worker --loglevel=info
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /srv
+    volumes:
+      - ./frontend:/srv
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+volumes:
+  db-data:
+  weather-cache:
