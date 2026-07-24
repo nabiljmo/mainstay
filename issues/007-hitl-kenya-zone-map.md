@@ -14,10 +14,10 @@ Nothing new — this is the Phase 1 milestone, done by a human. The actuary (act
 
 ## Acceptance criteria
 
-- [ ] Kenya CHIRPS fetched at the chosen depth (flag noted)
-- [ ] At least two candidate runs compared before choosing
-- [ ] KEN-v1 approved and frozen with audit record
-- [ ] Chosen parameters and the reasoning noted in the version record
+- [x] Kenya CHIRPS fetched at the chosen depth (flag noted)
+- [x] At least two candidate runs compared before choosing
+- [x] KEN-v1 approved and frozen with audit record
+- [x] Chosen parameters and the reasoning noted in the version record
 
 ## Blocked by
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from app.config import settings
 from app.countries import COUNTRIES
 from app.weather import WeatherStore
-from app.worker import celery_app, demo_job, fetch_weather, zoning_run
+from app.worker import celery_app, demo_job, draft_product, fetch_weather, zoning_run
 
 app = FastAPI(title="AEZ Creator & Weather Index Insurance Platform")
 
@@ -293,6 +293,99 @@ def save_crop_version(crop: str, req: CropSaveRequest) -> dict:
         crop, req.stages, req.seasons, req.edited_by, req.source, req.reviewed
     )
     return {**rec, "warnings": warnings}
+
+
+class ProductDraftRequest(BaseModel):
+    country: str
+    zone_map: str
+    crop: str
+    crop_version: int
+    season: str
+    start_year: int
+    end_year: int
+    sum_insured: float = 10000.0
+    created_by: str = "admin"
+
+
+@app.post("/products/draft")
+def start_product_draft(req: ProductDraftRequest) -> dict:
+    years = list(range(req.start_year, req.end_year + 1))
+    cached = set(_store().cached_years(req.country))
+    missing = [y for y in years if y not in cached]
+    if missing:
+        raise HTTPException(409, f"Years not cached: {missing} — fetch weather data first")
+    task = draft_product.delay(
+        req.country, req.zone_map, req.crop, req.crop_version, req.season,
+        years, req.sum_insured, req.created_by,
+    )
+    return {"job_id": task.id}
+
+
+@app.get("/products/drafts")
+def list_product_drafts() -> list[dict]:
+    from app.db import connect
+
+    with connect() as conn:
+        rows = conn.execute(
+            """SELECT id, country, zone_map, crop, crop_version, season, years,
+                      sum_insured, created_by, created_at
+               FROM product_drafts ORDER BY created_at DESC"""
+        ).fetchall()
+    return [
+        {
+            "id": r[0], "country": r[1], "zone_map": r[2], "crop": r[3],
+            "crop_version": r[4], "season": r[5], "years": r[6],
+            "sum_insured": r[7], "created_by": r[8], "created_at": r[9].isoformat(),
+        }
+        for r in rows
+    ]
+
+
+@app.get("/products/drafts/{draft_id}")
+def get_product_draft(draft_id: str) -> dict:
+    from app.db import connect
+
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT definition FROM product_drafts WHERE id = %s", (draft_id,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, f"No product draft {draft_id}")
+    return row[0]
+
+
+class PriceZoneRequest(BaseModel):
+    phases: list[dict]
+
+
+@app.post("/products/drafts/{draft_id}/zones/{zone}/price")
+def price_zone(draft_id: str, zone: int, req: PriceZoneRequest) -> dict:
+    """Recompute the per-year index/payout table for one zone with the given
+    (possibly edited) phase terms — the actuary's live feedback loop."""
+    from app.db import connect
+    from app.products import historical_table
+
+    with connect() as conn:
+        row = conn.execute(
+            """SELECT country, zone_map, years, definition
+               FROM product_drafts WHERE id = %s""",
+            (draft_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, f"No product draft {draft_id}")
+    country, zone_map, years, definition = row
+
+    with connect() as conn:
+        zrow = conn.execute(
+            "SELECT geojson FROM zone_map_versions WHERE name = %s", (zone_map,)
+        ).fetchone()
+    zone_geojson = zrow[0]
+
+    table = historical_table(
+        _store(), country, years, zone_geojson, zone, req.phases, definition["plant_start"]
+    )
+    avg_payout = sum(r["total_payout"] for r in table) / len(table) if table else 0.0
+    return {"zone": zone, "years": table, "burning_cost": round(avg_payout, 2)}
 
 
 @app.post("/jobs/demo")

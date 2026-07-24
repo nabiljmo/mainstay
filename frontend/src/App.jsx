@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import WeatherPanel from './WeatherPanel.jsx'
 import ZoningPanel from './ZoningPanel.jsx'
 import CropLibrary from './CropLibrary.jsx'
+import ProductDesign from './ProductDesign.jsx'
 
 const API = 'http://localhost:8000'
 
@@ -132,6 +133,9 @@ export default function App() {
           <button className={view === 'crops' ? 'on' : ''} onClick={() => setView('crops')}>
             Crop library
           </button>
+          <button className={view === 'products' ? 'on' : ''} onClick={() => setView('products')}>
+            Products
+          </button>
         </nav>
         <div className="status">
           <StatusDot label="api" state={health.api} />
@@ -148,6 +152,7 @@ export default function App() {
         <div ref={mapContainer} className="map" />
       </div>
       {view === 'crops' && <CropLibrary />}
+      {view === 'products' && <ProductDesign />}
     </div>
   )
 }

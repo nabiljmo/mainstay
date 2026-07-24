@@ -107,6 +107,69 @@ def zoning_run(
 
 
 @celery_app.task(bind=True)
+def draft_product(
+    self,
+    country: str,
+    zone_map: str,
+    crop: str,
+    crop_version: int,
+    season: str,
+    years: list[int],
+    sum_insured: float,
+    created_by: str,
+) -> dict:
+    """Assemble a draft product: propose phases/triggers per zone from history."""
+    import json
+    from datetime import datetime
+    from pathlib import Path
+
+    from app import crops
+    from app.db import connect
+    from app.products import propose_product
+    from app.weather import WeatherStore
+
+    self.update_state(state="PROGRESS", meta={"stage": "loading zone map + crop"})
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT geojson FROM zone_map_versions WHERE name = %s", (zone_map,)
+        ).fetchone()
+    if not row:
+        raise ValueError(f"No approved zone map named {zone_map}")
+    zone_geojson = row[0]
+
+    crop_rec = crops.get_version(crop, crop_version)
+    if not crop_rec:
+        raise ValueError(f"No crop {crop} v{crop_version}")
+    season_rec = next(
+        (s for s in crop_rec["seasons"] if s["country"] == country and s["season"] == season),
+        None,
+    )
+    if not season_rec:
+        raise ValueError(f"Crop {crop} has no {season} window for {country}")
+
+    self.update_state(state="PROGRESS", meta={"stage": "computing indices per zone"})
+    store = WeatherStore(cache_dir=Path(settings.weather_cache_dir))
+    definition = propose_product(
+        store, country, years, zone_geojson,
+        crop_rec["stages"], season_rec["plant_start"], sum_insured,
+    )
+
+    draft_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    with connect() as conn:
+        conn.execute(
+            """INSERT INTO product_drafts
+               (id, country, zone_map, crop, crop_version, season, years,
+                sum_insured, definition, created_by)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (
+                draft_id, country, zone_map, crop, crop_version, season,
+                json.dumps(years), sum_insured, json.dumps(definition), created_by,
+            ),
+        )
+    return {"draft_id": draft_id, "zones": len(definition["zones"])}
+
+
+@celery_app.task(bind=True)
 def demo_job(self, steps: int = 5) -> dict:
     """Walking-skeleton job: proves the api -> broker -> worker -> result
     round-trip that every real job (fetching, zoning, pricing) will use."""

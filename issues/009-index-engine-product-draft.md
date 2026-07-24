@@ -14,12 +14,12 @@ The heart. The Index Engine as a pure module: product definition + rainfall seri
 
 ## Acceptance criteria
 
-- [ ] Index Engine computes all three cover types correctly on synthetic series (golden tests, hand-computed)
-- [ ] Property tests: payout monotonic in deficit; never exceeds phase limit; strike/exit boundary behaviour exact
-- [ ] Product designer proposes phases, triggers, and limits from crop + zone history; every field editable
-- [ ] Historical per-phase index and payout table visible per zone before any pricing
-- [ ] Engine is date-agnostic: same call path works on any year range (settlement-ready)
-- [ ] Missing-day handling defined and tested
+- [x] Index Engine computes all three cover types correctly on synthetic series (golden tests, hand-computed)
+- [x] Property tests: payout monotonic in deficit; never exceeds phase limit; strike/exit boundary behaviour exact
+- [x] Product designer proposes phases, triggers, and limits from crop + zone history; every field editable
+- [x] Historical per-phase index and payout table visible per zone before any pricing
+- [x] Engine is date-agnostic: same call path works on any year range (settlement-ready)
+- [x] Missing-day handling defined and tested
 
 ## Blocked by
 

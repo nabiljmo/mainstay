@@ -31,6 +31,20 @@ CREATE TABLE IF NOT EXISTS crop_versions (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (crop, version)
 );
+
+CREATE TABLE IF NOT EXISTS product_drafts (
+    id           TEXT PRIMARY KEY,
+    country      TEXT NOT NULL,
+    zone_map     TEXT NOT NULL,
+    crop         TEXT NOT NULL,
+    crop_version INT NOT NULL,
+    season       TEXT NOT NULL,
+    years        JSONB NOT NULL,
+    sum_insured  DOUBLE PRECISION NOT NULL,
+    definition   JSONB NOT NULL,
+    created_by   TEXT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 # FAO-typical maize phenology. Four stages, ~130-day cycle.
