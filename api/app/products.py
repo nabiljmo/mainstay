@@ -13,9 +13,9 @@ from pathlib import Path
 import numpy as np
 
 from app.index_engine import (
-    Phase,
     apportion_limits,
     default_cover_for,
+    phase_from_dict,
     phase_index,
     phase_windows,
     planting_day_of_year,
@@ -107,6 +107,16 @@ def propose_product(
                 sl = series[plant_idx + start : plant_idx + end]
                 history.append(phase_index(sl, cover))
             strike, exit_ = propose_triggers(history, cover)
+            reference = float(np.mean(history)) if history else 0.0
+            # Express the same triggers as a % of normal so the actuary can
+            # work in either unit. Percent is the default when a normal exists.
+            if reference:
+                strike_pct = round(100 * strike / reference, 1)
+                exit_pct = round(100 * exit_ / reference, 1)
+                trigger_mode = "percent"
+            else:
+                strike_pct = exit_pct = None
+                trigger_mode = "absolute"
             phases.append(
                 {
                     "name": name,
@@ -115,6 +125,10 @@ def propose_product(
                     "end_offset": end,
                     "strike": strike,
                     "exit": exit_,
+                    "reference": round(reference, 2),
+                    "strike_pct": strike_pct,
+                    "exit_pct": exit_pct,
+                    "trigger_mode": trigger_mode,
                     "limit": round(limit, 2),
                     "history": [round(h, 2) for h in history],
                 }
@@ -141,18 +155,7 @@ def historical_table(
     plant_start: str,
 ) -> list[dict]:
     """Per-year index and payout for one zone, given finalised phase terms."""
-    phases = [
-        Phase(
-            name=p["name"],
-            cover_type=p["cover_type"],
-            start_offset=p["start_offset"],
-            end_offset=p["end_offset"],
-            strike=p["strike"],
-            exit_=p["exit"],
-            limit=p["limit"],
-        )
-        for p in phases_def
-    ]
+    phases = [phase_from_dict(p) for p in phases_def]
     rows = []
     for year in years:
         series = zone_daily_series(store, country, year, zone_geojson).get(zone_id)

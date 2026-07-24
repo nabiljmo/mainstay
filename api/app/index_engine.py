@@ -48,6 +48,36 @@ class Phase:
             raise ValueError(f"unknown cover type: {self.cover_type}")
 
 
+def phase_from_dict(p: dict) -> Phase:
+    """Build a Phase from a stored/edited definition, resolving percentage
+    triggers to absolute index units.
+
+    Triggers may be given two ways:
+      - absolute: strike/exit in the index's own units (mm, or dry days)
+      - percent : strike_pct/exit_pct as a % of the phase's `reference`
+                  (its historical mean index — the "normal"). e.g. a deficit
+                  strike of 80% pays once rainfall falls below 80% of normal.
+    """
+    mode = p.get("trigger_mode", "absolute")
+    ref = p.get("reference")
+    if mode == "percent" and ref:
+        strike = p["strike_pct"] / 100.0 * ref
+        exit_ = p["exit_pct"] / 100.0 * ref
+    else:
+        strike = p["strike"]
+        exit_ = p.get("exit_", p.get("exit"))
+    return Phase(
+        name=p["name"],
+        cover_type=p["cover_type"],
+        start_offset=p["start_offset"],
+        end_offset=p["end_offset"],
+        strike=strike,
+        exit_=exit_,
+        limit=p["limit"],
+        dry_threshold=p.get("dry_threshold", DEFAULT_DRY_THRESHOLD),
+    )
+
+
 # ----- phase window construction (the swappable "fixed calendar" rule) -----
 
 def phase_windows(stages: list[dict]) -> list[tuple[str, int, int, float]]:

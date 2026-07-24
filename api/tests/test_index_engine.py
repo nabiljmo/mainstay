@@ -9,6 +9,7 @@ from app.index_engine import (
     apportion_limits,
     longest_dry_run,
     payout_fraction,
+    phase_from_dict,
     phase_index,
     phase_payout,
     phase_windows,
@@ -146,6 +147,45 @@ def test_excess_triggers_from_high_tail():
     strike, exit_ = propose_triggers(history, EXCESS)
     assert exit_ > strike
     assert strike > np.percentile(history, 50)
+
+
+# ---------------- percentage triggers ----------------
+
+def test_percent_triggers_resolve_against_reference():
+    # deficit: strike 80% of a 100mm normal => 80mm; exit 40% => 40mm.
+    p = {
+        "name": "flo", "cover_type": DEFICIT, "start_offset": 0, "end_offset": 10,
+        "reference": 100.0, "strike_pct": 80, "exit_pct": 40,
+        "trigger_mode": "percent", "limit": 1000,
+    }
+    ph = phase_from_dict(p)
+    assert ph.strike == pytest.approx(80.0)
+    assert ph.exit_ == pytest.approx(40.0)
+    # index of 60mm (60% of normal) sits halfway between 80 and 40 => 0.5 payout
+    assert phase_payout(60, ph) == pytest.approx(500.0)
+
+
+def test_absolute_mode_ignores_percentages():
+    p = {
+        "name": "veg", "cover_type": DEFICIT, "start_offset": 0, "end_offset": 10,
+        "reference": 100.0, "strike": 90, "exit": 40,
+        "strike_pct": 999, "exit_pct": 999,
+        "trigger_mode": "absolute", "limit": 1000,
+    }
+    ph = phase_from_dict(p)
+    assert ph.strike == 90 and ph.exit_ == 40
+
+
+def test_percent_falls_back_to_absolute_without_reference():
+    # grain-fill in a bone-dry zone: no meaningful normal, so absolute is used.
+    p = {
+        "name": "grain", "cover_type": DEFICIT, "start_offset": 0, "end_offset": 10,
+        "reference": 0, "strike": 5, "exit": 1,
+        "strike_pct": None, "exit_pct": None,
+        "trigger_mode": "percent", "limit": 1000,
+    }
+    ph = phase_from_dict(p)
+    assert ph.strike == 5 and ph.exit_ == 1
 
 
 # ---------------- whole-year run ----------------

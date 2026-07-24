@@ -96,6 +96,14 @@ table.stages input:focus { outline: 1px solid #16a34a; border-radius: 3px; }
   background: #14532d; color: #fff; font-size: 0.9rem; cursor: pointer;
 }
 
+.trigger-mode { font-size: 0.82rem; margin: 0.75rem 0 0.25rem; display: flex; align-items: center; gap: 0.4rem; }
+.trigger-mode button {
+  margin: 0; padding: 0.25rem 0.6rem; background: #e5e7eb; color: #374151; font-size: 0.78rem;
+}
+.trigger-mode button.on { background: #14532d; color: #fff; }
+td.normal { color: #6b7280; font-size: 0.8rem; }
+.stages .hint { display: block; font-size: 0.68rem; color: #9ca3af; padding: 0 0.2rem; }
+
 .run {
   font-size: 0.78rem; padding: 0.45rem; border: 1px solid #e5e7eb; border-radius: 6px;
   margin-bottom: 0.4rem; cursor: pointer; color: #374151;

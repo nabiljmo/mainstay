@@ -16,6 +16,7 @@ export default function ProductDesign() {
   const [phases, setPhases] = useState([])
   const [pricing, setPricing] = useState(null)
   const [error, setError] = useState(null)
+  const [mode, setMode] = useState('percent') // 'percent' | 'absolute'
 
   const loadDrafts = () => fetch(`${API}/products/drafts`).then((r) => r.json()).then(setDrafts).catch(() => {})
 
@@ -65,8 +66,9 @@ export default function ProductDesign() {
   }
 
   const price = (id, z, p) => {
+    const withMode = p.map((ph) => ({ ...ph, trigger_mode: mode }))
     fetch(`${API}/products/drafts/${id}/zones/${z}/price`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phases: p }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phases: withMode }),
     }).then((r) => r.json()).then(setPricing).catch(() => {})
   }
 
@@ -75,6 +77,10 @@ export default function ProductDesign() {
     p[i] = { ...p[i], [field]: field === 'cover_type' ? value : Number(value) }
     setPhases(p)
   }
+
+  // Phases sent to the backend carry the current trigger mode so it resolves
+  // percentages against each phase's stored reference (normal).
+  const phasesForPricing = () => phases.map((p) => ({ ...p, trigger_mode: mode }))
 
   return (
     <div className="crop-view">
@@ -122,9 +128,25 @@ export default function ProductDesign() {
             </select>
           </label>
 
+          <div className="trigger-mode">
+            Triggers as:
+            <button className={mode === 'percent' ? 'on' : ''} onClick={() => setMode('percent')}>
+              % of normal
+            </button>
+            <button className={mode === 'absolute' ? 'on' : ''} onClick={() => setMode('absolute')}>
+              absolute
+            </button>
+          </div>
           <h3>Phases (editable)</h3>
           <table className="stages">
-            <thead><tr><th>Phase</th><th>Cover</th><th>Strike</th><th>Exit</th><th>Limit</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Phase</th><th>Cover</th><th>Normal</th>
+                <th>Strike {mode === 'percent' ? '(%)' : ''}</th>
+                <th>Exit {mode === 'percent' ? '(%)' : ''}</th>
+                <th>Limit</th>
+              </tr>
+            </thead>
             <tbody>
               {phases.map((p, i) => (
                 <tr key={i}>
@@ -136,8 +158,24 @@ export default function ProductDesign() {
                       <option value="dry_spell">dry_spell</option>
                     </select>
                   </td>
-                  <td><input type="number" value={p.strike} onChange={(e) => editPhase(i, 'strike', e.target.value)} /></td>
-                  <td><input type="number" value={p.exit} onChange={(e) => editPhase(i, 'exit', e.target.value)} /></td>
+                  <td className="normal">{p.reference}</td>
+                  {mode === 'percent' && p.reference ? (
+                    <>
+                      <td>
+                        <input type="number" value={p.strike_pct ?? ''} onChange={(e) => editPhase(i, 'strike_pct', e.target.value)} />
+                        <span className="hint">{((p.strike_pct / 100) * p.reference).toFixed(1)}</span>
+                      </td>
+                      <td>
+                        <input type="number" value={p.exit_pct ?? ''} onChange={(e) => editPhase(i, 'exit_pct', e.target.value)} />
+                        <span className="hint">{((p.exit_pct / 100) * p.reference).toFixed(1)}</span>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td><input type="number" value={p.strike} onChange={(e) => editPhase(i, 'strike', e.target.value)} /></td>
+                      <td><input type="number" value={p.exit} onChange={(e) => editPhase(i, 'exit', e.target.value)} /></td>
+                    </>
+                  )}
                   <td><input type="number" value={p.limit} onChange={(e) => editPhase(i, 'limit', e.target.value)} /></td>
                 </tr>
               ))}
