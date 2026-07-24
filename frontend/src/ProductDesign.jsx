@@ -17,6 +17,7 @@ export default function ProductDesign() {
   const [pricing, setPricing] = useState(null)
   const [error, setError] = useState(null)
   const [mode, setMode] = useState('percent') // 'percent' | 'absolute'
+  const [tip, setTip] = useState(null) // { text, x, y }
 
   const loadDrafts = () => fetch(`${API}/products/drafts`).then((r) => r.json()).then(setDrafts).catch(() => {})
 
@@ -81,6 +82,10 @@ export default function ProductDesign() {
   // Phases sent to the backend carry the current trigger mode so it resolves
   // percentages against each phase's stored reference (normal).
   const phasesForPricing = () => phases.map((p) => ({ ...p, trigger_mode: mode }))
+
+  const showTip = (text) => (e) => setTip({ text, x: e.clientX, y: e.clientY })
+  const moveTip = (e) => setTip((t) => (t ? { ...t, x: e.clientX, y: e.clientY } : t))
+  const hideTip = () => setTip(null)
 
   return (
     <div className="crop-view">
@@ -204,11 +209,24 @@ export default function ProductDesign() {
                     <tr key={y.year}>
                       <td>{y.year}</td>
                       {y.phases.map((ph, i) => (
-                        <td key={i} title={ph.why} className={ph.payout > 0 ? 'paid' : ''}>
+                        <td
+                          key={i}
+                          className={`tipcell ${ph.payout > 0 ? 'paid' : ''}`}
+                          onMouseEnter={showTip(ph.why)}
+                          onMouseMove={moveTip}
+                          onMouseLeave={hideTip}
+                        >
                           {ph.payout.toFixed(0)}
                         </td>
                       ))}
-                      <td title={y.summary}><strong>{y.total_payout.toFixed(0)}</strong></td>
+                      <td
+                        className="tipcell"
+                        onMouseEnter={showTip(y.summary)}
+                        onMouseMove={moveTip}
+                        onMouseLeave={hideTip}
+                      >
+                        <strong>{y.total_payout.toFixed(0)}</strong>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -224,6 +242,15 @@ export default function ProductDesign() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {tip && (
+        <div
+          className="hover-tip"
+          style={{ left: Math.min(tip.x + 14, window.innerWidth - 340), top: tip.y + 16 }}
+        >
+          {tip.text}
         </div>
       )}
     </div>

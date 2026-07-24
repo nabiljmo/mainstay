@@ -117,7 +117,15 @@ td.normal { color: #6b7280; font-size: 0.8rem; }
 }
 .hint-note { font-size: 0.75rem; color: #9ca3af; margin-top: 0.35rem; font-style: italic; }
 .stages td.paid { background: #fef9c3; }
-.stages td[title] { cursor: help; }
+.stages td.tipcell { cursor: help; }
+.stages td.tipcell:hover { outline: 2px solid #16a34a; outline-offset: -2px; }
+
+.hover-tip {
+  position: fixed; z-index: 1000; max-width: 320px;
+  background: #14532d; color: #fff; font-size: 0.8rem; line-height: 1.4;
+  padding: 0.55rem 0.7rem; border-radius: 6px; pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+}
 .stages .hint { display: block; font-size: 0.68rem; color: #9ca3af; padding: 0 0.2rem; }
 
 .run {
