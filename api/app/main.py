@@ -17,7 +17,7 @@ app = FastAPI(title="AEZ Creator & Weather Index Insurance Platform")
 @app.on_event("startup")
 def _bootstrap_schema() -> None:
     if settings.database_url:
-        from app import crops, publish
+        from app import crops, publish, quotes
         from app.db import init_schema
 
         try:
@@ -25,6 +25,7 @@ def _bootstrap_schema() -> None:
             crops.init_schema()
             crops.seed_if_empty()
             publish.init_schema()
+            quotes.init_schema()
         except Exception:
             pass  # /health surfaces db state; don't block startup on a race
 
@@ -533,6 +534,68 @@ def query_rates(country: str, crop: str, season: str, zone: int | None = None) -
     from app.publish import get_rates
 
     return get_rates(country, crop, season, zone)
+
+
+# ---------------------------------------------------------------------------
+# Quoting (issue 014): pin -> zone -> published rate -> premium, in under a
+# second. Same service backs the partner API and the agent page. (Auth / agent
+# scoping is issue 013.)
+# ---------------------------------------------------------------------------
+
+class QuoteRequest(BaseModel):
+    country: str
+    crop: str
+    season: str
+    sum_insured: float
+    lat: float
+    lon: float
+    admin_area: str | None = None
+    created_by: str = "agent"
+
+
+@app.post("/quotes")
+def create_quote_endpoint(req: QuoteRequest) -> dict:
+    from app.quotes import create_quote
+
+    return create_quote(
+        req.country, req.crop, req.season, req.sum_insured,
+        req.lat, req.lon, req.admin_area, req.created_by,
+    )
+
+
+@app.get("/quotes/{reference}")
+def get_quote_endpoint(reference: str) -> dict:
+    from app.quotes import get_quote
+
+    q = get_quote(reference)
+    if not q:
+        raise HTTPException(404, f"No quote {reference}")
+    return q
+
+
+@app.get("/quote-areas")
+def quote_areas_endpoint(country: str) -> list[dict]:
+    """Admin districts + centroids for the village-picker fallback."""
+    from app.quotes import quote_areas
+
+    return quote_areas(settings.weather_cache_dir, country)
+
+
+@app.get("/demand-signals")
+def demand_signals_endpoint(country: str | None = None) -> list[dict]:
+    from app.quotes import list_demand_signals
+
+    return list_demand_signals(country)
+
+
+@app.get("/agent")
+def agent_page():
+    """Lightweight, phone-friendly quoting page for field agents."""
+    from fastapi.responses import HTMLResponse
+
+    from app.quotes import AGENT_PAGE
+
+    return HTMLResponse(AGENT_PAGE)
 
 
 @app.post("/jobs/demo")
