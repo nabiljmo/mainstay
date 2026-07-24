@@ -185,20 +185,43 @@ export default function ProductDesign() {
 
           {pricing && (
             <>
-              <h3>Historical payouts — burning cost {pricing.burning_cost} of {openDraft.definition.sum_insured}
-                {' '}({(100 * pricing.burning_cost / openDraft.definition.sum_insured).toFixed(1)}%)</h3>
+              {pricing.phase_meanings && (
+                <div className="explainer">
+                  <h3>What these settings mean</h3>
+                  <ul>
+                    {pricing.phase_meanings.map((m) => (
+                      <li key={m.name}>{m.meaning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <h3>Historical payouts</h3>
               <table className="stages">
                 <thead><tr><th>Year</th>{phases.map((p) => <th key={p.name}>{p.name.slice(0, 5)}</th>)}<th>Total</th></tr></thead>
                 <tbody>
                   {pricing.years.map((y) => (
                     <tr key={y.year}>
                       <td>{y.year}</td>
-                      {y.phases.map((ph, i) => <td key={i}>{ph.payout.toFixed(0)}</td>)}
-                      <td><strong>{y.total_payout.toFixed(0)}</strong></td>
+                      {y.phases.map((ph, i) => (
+                        <td key={i} title={ph.why} className={ph.payout > 0 ? 'paid' : ''}>
+                          {ph.payout.toFixed(0)}
+                        </td>
+                      ))}
+                      <td title={y.summary}><strong>{y.total_payout.toFixed(0)}</strong></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <p className="hint-note">Hover any figure for a plain-words explanation.</p>
+
+              <div className="explainer">
+                <h3>In plain words</h3>
+                <p className="bc-explain">{pricing.burning_cost_explanation}</p>
+                <ul>
+                  {pricing.years.map((y) => <li key={y.year}>{y.summary}</li>)}
+                </ul>
+              </div>
             </>
           )}
         </div>

@@ -384,8 +384,46 @@ def price_zone(draft_id: str, zone: int, req: PriceZoneRequest) -> dict:
     table = historical_table(
         _store(), country, years, zone_geojson, zone, req.phases, definition["plant_start"]
     )
+    sum_insured = definition["sum_insured"]
     avg_payout = sum(r["total_payout"] for r in table) / len(table) if table else 0.0
-    return {"zone": zone, "years": table, "burning_cost": round(avg_payout, 2)}
+
+    # Auto-explainer: attach plain-words explanations to every calculation.
+    from app.explain import (
+        explain_burning_cost,
+        explain_payout,
+        explain_phase,
+        explain_year,
+    )
+    from app.index_engine import phase_from_dict
+
+    resolved = {}
+    phase_meanings = []
+    for p in req.phases:
+        rp = phase_from_dict({**p, "trigger_mode": p.get("trigger_mode", "absolute")})
+        resolved[rp.name] = (rp, p.get("reference"))
+        phase_meanings.append(
+            {
+                "name": rp.name,
+                "meaning": explain_phase(rp.name, rp.cover_type, p.get("reference"), rp.strike, rp.exit_, rp.limit),
+            }
+        )
+
+    for yr in table:
+        for ph in yr["phases"]:
+            rp, _ref = resolved[ph["phase"]]
+            ph["why"] = explain_payout(
+                yr["year"], rp.name, rp.cover_type, ph["index"], rp.strike, rp.exit_, ph["limit"], ph["payout"]
+            )
+        yr["summary"] = explain_year(yr["year"], yr["phases"], sum_insured)
+
+    return {
+        "zone": zone,
+        "years": table,
+        "burning_cost": round(avg_payout, 2),
+        "sum_insured": sum_insured,
+        "phase_meanings": phase_meanings,
+        "burning_cost_explanation": explain_burning_cost(avg_payout, sum_insured, len(table)),
+    }
 
 
 @app.post("/jobs/demo")
