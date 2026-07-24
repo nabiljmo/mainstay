@@ -461,10 +461,29 @@ def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest) -> dict
         ).fetchone()
     zone_geojson = zrow[0]
 
+    from app.explain import explain_burning_cost, explain_payout, explain_phase, explain_year
+    from app.index_engine import phase_from_dict as _pfd
+
     table = historical_table(
-        _store(), country, years, zone_geojson, zone, req.phases, definition["plant_start"]
+        _store(), country, years, zone_geojson, zone, req.phases,
+        definition["plant_start"], cache_key=draft_id,
     )
     losses = [r["total_payout"] for r in table]
+
+    # Payout-history explanations (previously the separate /price call).
+    resolved = {}
+    phase_meanings = []
+    for p in req.phases:
+        rp = _pfd({**p, "trigger_mode": p.get("trigger_mode", "absolute")})
+        resolved[rp.name] = rp
+        phase_meanings.append(
+            {"name": rp.name, "meaning": explain_phase(rp.name, rp.cover_type, p.get("reference"), rp.strike, rp.exit_, rp.limit)}
+        )
+    for yr in table:
+        for ph in yr["phases"]:
+            rp = resolved[ph["phase"]]
+            ph["why"] = explain_payout(yr["year"], rp.name, rp.cover_type, ph["index"], rp.strike, rp.exit_, ph["limit"], ph["payout"])
+        yr["summary"] = explain_year(yr["year"], yr["phases"], sum_insured)
 
     econ = expected_loss(losses, sum_insured, dist=req.distribution)
     loadings = req.loadings if req.loadings is not None else DEFAULT_LOADINGS
@@ -474,6 +493,12 @@ def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest) -> dict
         "zone": zone,
         "sum_insured": sum_insured,
         "quality_flag": _qflag(len(years)),
+        # payout-history block (drives the historical table + plain words)
+        "years": table,
+        "burning_cost": econ["burning_cost"],
+        "burning_cost_explanation": explain_burning_cost(econ["burning_cost"], sum_insured, len(table)),
+        "phase_meanings": phase_meanings,
+        # pricing block
         "economics": econ,
         "price": price,
         "explanations": {

@@ -25,6 +25,21 @@ from app.index_engine import (
 from app.weather import WeatherStore, days_in_year
 
 
+# Cache each draft-year's per-zone daily series. Within a draft the zone map
+# and rainfall are fixed, so this is stable across trigger edits and zone
+# switches — the expensive file loads and spatial queries run only once.
+_YEAR_SERIES_CACHE: dict[tuple, dict[int, np.ndarray]] = {}
+
+
+def cached_year_series(
+    cache_key: str, store: WeatherStore, country: str, year: int, zone_geojson: dict
+) -> dict[int, np.ndarray]:
+    key = (cache_key, year)
+    if key not in _YEAR_SERIES_CACHE:
+        _YEAR_SERIES_CACHE[key] = zone_daily_series(store, country, year, zone_geojson)
+    return _YEAR_SERIES_CACHE[key]
+
+
 def zone_daily_series(
     store: WeatherStore, country: str, year: int, zone_geojson: dict
 ) -> dict[int, np.ndarray]:
@@ -153,12 +168,16 @@ def historical_table(
     zone_id: int,
     phases_def: list[dict],
     plant_start: str,
+    cache_key: str | None = None,
 ) -> list[dict]:
     """Per-year index and payout for one zone, given finalised phase terms."""
     phases = [phase_from_dict(p) for p in phases_def]
     rows = []
     for year in years:
-        series = zone_daily_series(store, country, year, zone_geojson).get(zone_id)
+        if cache_key:
+            series = cached_year_series(cache_key, store, country, year, zone_geojson).get(zone_id)
+        else:
+            series = zone_daily_series(store, country, year, zone_geojson).get(zone_id)
         if series is None:
             continue
         plant_idx = planting_day_of_year(plant_start, year)

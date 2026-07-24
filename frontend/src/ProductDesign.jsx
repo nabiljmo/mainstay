@@ -42,6 +42,7 @@ export default function ProductDesign() {
   const [distribution, setDistribution] = useState('gamma')
   const [loadings, setLoadings] = useState(null)
   const [econ, setEcon] = useState(null)
+  const [computing, setComputing] = useState(false)
 
   const loadDrafts = () => fetch(`${API}/products/drafts`).then((r) => r.json()).then(setDrafts).catch(() => {})
 
@@ -91,22 +92,32 @@ export default function ProductDesign() {
     price(id, z, p)
   }
 
-  const price = (id, z, p) => {
-    const withMode = p.map((ph) => ({ ...ph, trigger_mode: mode }))
-    fetch(`${API}/products/drafts/${id}/zones/${z}/price`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phases: withMode }),
-    }).then((r) => r.json()).then(setPricing).catch(() => {})
-    priceEconomics(id, z, p)
-  }
-
-  const priceEconomics = (id, z, p, distOverride) => {
+  // One call computes payouts and pricing together (and the backend caches
+  // the rainfall series per draft, so repeat computes are near-instant).
+  const price = (id, z, p, distOverride) => {
     if (!loadings) return
     const withMode = p.map((ph) => ({ ...ph, trigger_mode: mode }))
+    setComputing(true)
     fetch(`${API}/products/drafts/${id}/zones/${z}/economics`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phases: withMode, distribution: distOverride || distribution, loadings }),
-    }).then((r) => r.json()).then(setEcon).catch(() => {})
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        setEcon(d)
+        setPricing({
+          years: d.years,
+          burning_cost: d.burning_cost,
+          burning_cost_explanation: d.burning_cost_explanation,
+          phase_meanings: d.phase_meanings,
+          sum_insured: d.sum_insured,
+        })
+      })
+      .catch(() => {})
+      .finally(() => setComputing(false))
   }
+
+  const priceEconomics = (id, z, p, distOverride) => price(id, z, p, distOverride)
 
   const editLoading = (i, field, value) => {
     const l = [...loadings]
@@ -229,7 +240,9 @@ export default function ProductDesign() {
               ))}
             </tbody>
           </table>
-          <button onClick={() => price(openDraft.id, zone, phases)}>Recompute payouts</button>
+          <button onClick={() => price(openDraft.id, zone, phases)} disabled={computing}>
+            {computing ? 'Computing…' : 'Recompute payouts'}
+          </button>
 
           {pricing && (
             <>
@@ -339,7 +352,9 @@ export default function ProductDesign() {
                   </table>
                   <div className="loading-actions">
                     <button className="secondary" onClick={addLoading}>+ Add loading</button>
-                    <button onClick={() => priceEconomics(openDraft.id, zone, phases)}>Apply</button>
+                    <button onClick={() => priceEconomics(openDraft.id, zone, phases)} disabled={computing}>
+                      {computing ? 'Computing…' : 'Apply'}
+                    </button>
                   </div>
 
                   <div className="premium-box">
