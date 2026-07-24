@@ -2,6 +2,27 @@ import { useEffect, useState } from 'react'
 
 const API = 'http://localhost:8000'
 
+function QQPlot({ qq }) {
+  const W = 260, H = 160, pad = 30
+  const all = qq.flatMap((p) => [p.actual, p.theoretical])
+  const lo = Math.min(...all), hi = Math.max(...all)
+  const sx = (v) => pad + ((v - lo) / (hi - lo || 1)) * (W - 2 * pad)
+  const sy = (v) => H - pad - ((v - lo) / (hi - lo || 1)) * (H - 2 * pad)
+  return (
+    <div className="qq">
+      <svg width={W} height={H}>
+        <line x1={sx(lo)} y1={sy(lo)} x2={sx(hi)} y2={sy(hi)} stroke="#9ca3af" strokeDasharray="3 3" />
+        {qq.map((p, i) => (
+          <circle key={i} cx={sx(p.theoretical)} cy={sy(p.actual)} r="3.5" fill="#16a34a" />
+        ))}
+        <text x={W / 2} y={H - 4} textAnchor="middle" fontSize="9" fill="#6b7280">fitted quantile</text>
+        <text x="8" y={H / 2} fontSize="9" fill="#6b7280" transform={`rotate(-90 8 ${H / 2})`} textAnchor="middle">actual</text>
+      </svg>
+      <span className="qq-note">Points near the dashed line mean the fit is good.</span>
+    </div>
+  )
+}
+
 export default function ProductDesign() {
   const [maps, setMaps] = useState([])
   const [crops, setCrops] = useState([])
@@ -18,6 +39,9 @@ export default function ProductDesign() {
   const [error, setError] = useState(null)
   const [mode, setMode] = useState('percent') // 'percent' | 'absolute'
   const [tip, setTip] = useState(null) // { text, x, y }
+  const [distribution, setDistribution] = useState('gamma')
+  const [loadings, setLoadings] = useState(null)
+  const [econ, setEcon] = useState(null)
 
   const loadDrafts = () => fetch(`${API}/products/drafts`).then((r) => r.json()).then(setDrafts).catch(() => {})
 
@@ -27,6 +51,7 @@ export default function ProductDesign() {
       if (m.length) setForm((f) => ({ ...f, zone_map: m[0].name }))
     })
     fetch(`${API}/crops`).then((r) => r.json()).then(setCrops)
+    fetch(`${API}/pricing/defaults`).then((r) => r.json()).then((d) => setLoadings(d.loadings))
     loadDrafts()
   }, [])
 
@@ -71,7 +96,25 @@ export default function ProductDesign() {
     fetch(`${API}/products/drafts/${id}/zones/${z}/price`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phases: withMode }),
     }).then((r) => r.json()).then(setPricing).catch(() => {})
+    priceEconomics(id, z, p)
   }
+
+  const priceEconomics = (id, z, p, distOverride) => {
+    if (!loadings) return
+    const withMode = p.map((ph) => ({ ...ph, trigger_mode: mode }))
+    fetch(`${API}/products/drafts/${id}/zones/${z}/economics`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phases: withMode, distribution: distOverride || distribution, loadings }),
+    }).then((r) => r.json()).then(setEcon).catch(() => {})
+  }
+
+  const editLoading = (i, field, value) => {
+    const l = [...loadings]
+    l[i] = { ...l[i], [field]: field === 'value' ? Number(value) : value }
+    setLoadings(l)
+  }
+  const addLoading = () => setLoadings([...loadings, { name: 'New loading', basis: 'pct_gross', value: 5 }])
+  const removeLoading = (i) => setLoadings(loadings.filter((_, j) => j !== i))
 
   const editPhase = (i, field, value) => {
     const p = [...phases]
@@ -240,6 +283,82 @@ export default function ProductDesign() {
                   {pricing.years.map((y) => <li key={y.year}>{y.summary}</li>)}
                 </ul>
               </div>
+
+              {econ && (
+                <div className="pricing-panel">
+                  <h3>Pricing this zone</h3>
+
+                  <div className="el-row">
+                    <div className="el-box">
+                      <span className="el-label">Burning cost</span>
+                      <span className="el-val">{econ.economics.burning_cost.toLocaleString()}</span>
+                    </div>
+                    <div className="el-box">
+                      <span className="el-label">Modelled EL</span>
+                      <span className="el-val">{econ.economics.modelled_el.toLocaleString()}</span>
+                    </div>
+                    <div className="el-box chosen">
+                      <span className="el-label">Expected loss</span>
+                      <span className="el-val">{econ.economics.technical_el.toLocaleString()}</span>
+                    </div>
+                    <label className="dist-select">
+                      Fit
+                      <select value={distribution} onChange={(e) => { setDistribution(e.target.value); priceEconomics(openDraft.id, zone, phases, e.target.value) }}>
+                        <option value="gamma">gamma</option>
+                        <option value="lognormal">lognormal</option>
+                        <option value="normal">normal</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p className="bc-explain">{econ.explanations.expected_loss}</p>
+
+                  {econ.economics.qq.length > 0 && <QQPlot qq={econ.economics.qq} />}
+
+                  <h4>Loadings</h4>
+                  <table className="stages">
+                    <thead><tr><th>Name</th><th>Basis</th><th>Value</th><th>Adds</th><th></th></tr></thead>
+                    <tbody>
+                      {loadings.map((l, i) => (
+                        <tr key={i}>
+                          <td><input value={l.name} onChange={(e) => editLoading(i, 'name', e.target.value)} /></td>
+                          <td>
+                            <select value={l.basis} onChange={(e) => editLoading(i, 'basis', e.target.value)}>
+                              <option value="pct_el">% of expected loss</option>
+                              <option value="pct_gross">% of premium</option>
+                              <option value="flat">flat amount</option>
+                            </select>
+                          </td>
+                          <td><input type="number" value={l.value} onChange={(e) => editLoading(i, 'value', e.target.value)} /></td>
+                          <td className="normal">
+                            {econ.price.loading_breakdown[i]?.amount?.toLocaleString() ?? '—'}
+                          </td>
+                          <td><button className="del" onClick={() => removeLoading(i)}>✕</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="loading-actions">
+                    <button className="secondary" onClick={addLoading}>+ Add loading</button>
+                    <button onClick={() => priceEconomics(openDraft.id, zone, phases)}>Apply</button>
+                  </div>
+
+                  <div className="premium-box">
+                    <div>
+                      <span className="premium-rate">{econ.price.premium_rate}%</span>
+                      <span className="premium-sub">of sum insured</span>
+                    </div>
+                    <div>
+                      <span className="premium-amt">{econ.price.gross_premium.toLocaleString()}</span>
+                      <span className="premium-sub">premium on {econ.sum_insured.toLocaleString()}</span>
+                    </div>
+                    <span className={`flag ${econ.quality_flag}`} title={`${econ.economics.n_years} years of data`} />
+                  </div>
+                  <p className="bc-explain">{econ.explanations.premium}</p>
+                  <ul className="explainer">
+                    {econ.explanations.loadings.map((t, i) => <li key={i}>{t}</li>)}
+                  </ul>
+                </div>
+              )}
             </>
           )}
         </div>

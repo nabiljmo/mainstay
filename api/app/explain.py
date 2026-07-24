@@ -123,6 +123,50 @@ def explain_year(year: int, phases: list[dict], sum_insured: float) -> str:
     )
 
 
+def explain_expected_loss(econ: dict, sum_insured: float) -> str:
+    """What the expected-loss figures mean and why one was chosen."""
+    bc = econ["burning_cost"]
+    model = econ["modelled_el"]
+    tech = econ["technical_el"]
+    freq = round(econ["frequency"] * 100)
+    chosen = "the burning cost" if tech == bc else "the modelled figure"
+    return (
+        f"On average a payout happened in about {freq}% of years. The plain average payout "
+        f"(the 'burning cost') is {_money(bc)}. A fitted model, which smooths out such a short "
+        f"history, gives {_money(model)}. We take the higher of the two — {_money(tech)}, "
+        f"{chosen} — as the expected loss, the amount we'd expect to pay each year. That's the "
+        f"starting point for the price, before any costs or margin."
+    )
+
+
+def explain_premium(econ: dict, price: dict, sum_insured: float) -> str:
+    """How the expected loss became the final premium."""
+    el = price["expected_loss"]
+    gross = price["gross_premium"]
+    rate = price["premium_rate"]
+    added = gross - el
+    return (
+        f"We start from the {_money(el)} expected loss. On top we add {_money(added)} of "
+        f"loadings — the running costs, sales commission and a margin for safety and profit — "
+        f"to reach a premium of {_money(gross)}. For {_money(sum_insured)} of cover that is a "
+        f"rate of {rate}% — so a farmer insuring {_money(sum_insured)} would pay about "
+        f"{_money(gross)} for the season."
+    )
+
+
+def explain_loading(loading: dict, sum_insured: float) -> str:
+    """One loading line, in plain words."""
+    name = loading["name"]
+    amt = loading.get("amount", 0)
+    if loading["basis"] == "pct_el":
+        how = f"{loading['value']}% of the expected loss"
+    elif loading["basis"] == "pct_gross":
+        how = f"{loading['value']}% of the final premium"
+    else:
+        how = "a fixed amount per policy"
+    return f"{name}: {how}, adding {_money(amt)}."
+
+
 def explain_burning_cost(burning_cost: float, sum_insured: float, n_years: int) -> str:
     """What the burning cost figure means."""
     pct = round(100 * burning_cost / sum_insured, 1) if sum_insured else 0

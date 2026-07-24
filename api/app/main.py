@@ -426,6 +426,71 @@ def price_zone(draft_id: str, zone: int, req: PriceZoneRequest) -> dict:
     }
 
 
+class PriceEconomicsRequest(BaseModel):
+    phases: list[dict]
+    distribution: str = "gamma"
+    loadings: list[dict] | None = None
+
+
+@app.post("/products/drafts/{draft_id}/zones/{zone}/economics")
+def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest) -> dict:
+    """Full pricing for one zone: expected loss + loadings -> commercial rate."""
+    from app.db import connect
+    from app.explain import (
+        explain_expected_loss,
+        explain_loading,
+        explain_premium,
+    )
+    from app.pricing import DEFAULT_LOADINGS, apply_loadings, expected_loss
+    from app.products import historical_table
+    from app.zoning import quality_flag as _qflag
+
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT country, zone_map, years, definition FROM product_drafts WHERE id = %s",
+            (draft_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, f"No product draft {draft_id}")
+    country, zone_map, years, definition = row
+    sum_insured = definition["sum_insured"]
+
+    with connect() as conn:
+        zrow = conn.execute(
+            "SELECT geojson FROM zone_map_versions WHERE name = %s", (zone_map,)
+        ).fetchone()
+    zone_geojson = zrow[0]
+
+    table = historical_table(
+        _store(), country, years, zone_geojson, zone, req.phases, definition["plant_start"]
+    )
+    losses = [r["total_payout"] for r in table]
+
+    econ = expected_loss(losses, sum_insured, dist=req.distribution)
+    loadings = req.loadings if req.loadings is not None else DEFAULT_LOADINGS
+    price = apply_loadings(econ["technical_el"], loadings, sum_insured)
+
+    return {
+        "zone": zone,
+        "sum_insured": sum_insured,
+        "quality_flag": _qflag(len(years)),
+        "economics": econ,
+        "price": price,
+        "explanations": {
+            "expected_loss": explain_expected_loss(econ, sum_insured),
+            "premium": explain_premium(econ, price, sum_insured),
+            "loadings": [explain_loading(b, sum_insured) for b in price["loading_breakdown"]],
+        },
+    }
+
+
+@app.get("/pricing/defaults")
+def pricing_defaults() -> dict:
+    from app.pricing import DEFAULT_LOADINGS, DISTRIBUTIONS
+
+    return {"loadings": DEFAULT_LOADINGS, "distributions": list(DISTRIBUTIONS)}
+
+
 @app.post("/jobs/demo")
 def start_demo_job() -> dict:
     task = demo_job.delay()
