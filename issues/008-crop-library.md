@@ -14,11 +14,11 @@ In-app crop knowledge: create/edit crop records (growth stages with durations an
 
 ## Acceptance criteria
 
-- [ ] CRUD screens for crops: stages, durations, stress weights, per-country planting windows
-- [ ] Every edit produces a new version with editor attribution; history viewable
-- [ ] Kenya maize long-rains record present, marked as FAO-seeded
-- [ ] Stage durations must sum to a sane season length (validated, warning not block)
-- [ ] Test: version immutability once referenced
+- [x] CRUD screens for crops: stages, durations, stress weights, per-country planting windows
+- [x] Every edit produces a new version with editor attribution; history viewable
+- [x] Kenya maize long-rains record present, marked as FAO-seeded
+- [x] Stage durations must sum to a sane season length (validated, warning not block)
+- [x] Test: version immutability once referenced
 
 ## Blocked by
 

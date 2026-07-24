@@ -17,10 +17,13 @@ app = FastAPI(title="AEZ Creator & Weather Index Insurance Platform")
 @app.on_event("startup")
 def _bootstrap_schema() -> None:
     if settings.database_url:
+        from app import crops
         from app.db import init_schema
 
         try:
             init_schema()
+            crops.init_schema()
+            crops.seed_if_empty()
         except Exception:
             pass  # /health surfaces db state; don't block startup on a race
 
@@ -247,6 +250,49 @@ def zone_map_geojson(name: str) -> dict:
     if not row:
         raise HTTPException(404, f"No approved zone map named '{name}'")
     return row[0]
+
+
+@app.get("/crops")
+def list_crops() -> list[dict]:
+    from app import crops
+
+    return crops.latest_versions()
+
+
+@app.get("/crops/{crop}/versions")
+def crop_versions(crop: str) -> list[dict]:
+    from app import crops
+
+    return crops.versions_of(crop)
+
+
+@app.get("/crops/{crop}/versions/{version}")
+def crop_version(crop: str, version: int) -> dict:
+    from app import crops
+
+    rec = crops.get_version(crop, version)
+    if not rec:
+        raise HTTPException(404, f"No version {version} of crop '{crop}'")
+    return rec
+
+
+class CropSaveRequest(BaseModel):
+    stages: list[dict]
+    seasons: list[dict]
+    edited_by: str
+    source: str = ""
+    reviewed: bool = False
+
+
+@app.post("/crops/{crop}/versions")
+def save_crop_version(crop: str, req: CropSaveRequest) -> dict:
+    from app import crops
+
+    warnings = crops.validate(req.stages, req.seasons)
+    rec = crops.save_new_version(
+        crop, req.stages, req.seasons, req.edited_by, req.source, req.reviewed
+    )
+    return {**rec, "warnings": warnings}
 
 
 @app.post("/jobs/demo")

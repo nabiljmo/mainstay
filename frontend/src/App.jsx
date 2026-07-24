@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import WeatherPanel from './WeatherPanel.jsx'
 import ZoningPanel from './ZoningPanel.jsx'
+import CropLibrary from './CropLibrary.jsx'
 
 const API = 'http://localhost:8000'
 
@@ -29,6 +30,7 @@ export default function App() {
   const [health, setHealth] = useState({})
   const [country, setCountry] = useState('KEN')
   const [zones, setZones] = useState(null)
+  const [view, setView] = useState('zoning')
 
   useEffect(() => {
     const map = new maplibregl.Map({
@@ -123,13 +125,21 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <h1>AEZ Creator &amp; Weather Index Insurance Platform</h1>
+        <nav className="tabs">
+          <button className={view === 'zoning' ? 'on' : ''} onClick={() => setView('zoning')}>
+            Zoning
+          </button>
+          <button className={view === 'crops' ? 'on' : ''} onClick={() => setView('crops')}>
+            Crop library
+          </button>
+        </nav>
         <div className="status">
           <StatusDot label="api" state={health.api} />
           <StatusDot label="db" state={health.db} />
           <StatusDot label="worker" state={health.worker} />
         </div>
       </header>
-      <div className="body">
+      <div className="body" style={{ display: view === 'zoning' ? 'flex' : 'none' }}>
         <aside className="sidebar">
           <WeatherPanel country={country} onCountry={setCountry} />
           <hr className="divider" />
@@ -137,6 +147,7 @@ export default function App() {
         </aside>
         <div ref={mapContainer} className="map" />
       </div>
+      {view === 'crops' && <CropLibrary />}
     </div>
   )
 }

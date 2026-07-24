@@ -9,6 +9,13 @@ html, body, #root { height: 100%; font-family: system-ui, sans-serif; }
 }
 .topbar h1 { font-size: 1.05rem; font-weight: 600; }
 
+.tabs { display: flex; gap: 0.5rem; }
+.tabs button {
+  background: transparent; color: #cbd5c9; border: none; padding: 0.35rem 0.8rem;
+  border-radius: 6px; font-size: 0.85rem; cursor: pointer;
+}
+.tabs button.on { background: rgba(255,255,255,0.18); color: #fff; }
+
 .status { display: flex; gap: 0.75rem; font-size: 0.85rem; }
 .status span { display: flex; align-items: center; gap: 0.35rem; }
 .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #9ca3af; }
@@ -57,6 +64,37 @@ html, body, #root { height: 100%; font-family: system-ui, sans-serif; }
 .flag.green { background: #16a34a; }
 .flag.amber { background: #f59e0b; }
 .flag.red { background: #dc2626; }
+
+.crop-view { display: flex; flex: 1; min-height: 0; }
+.crop-list {
+  width: 240px; padding: 1rem; overflow-y: auto;
+  background: #f8faf8; border-right: 1px solid #e5e7eb;
+}
+.crop-list h2 { font-size: 1rem; margin-bottom: 0.75rem; }
+.crop-edit { flex: 1; padding: 1.5rem; overflow-y: auto; }
+.crop-edit h2 { font-size: 1.1rem; margin-bottom: 0.25rem; }
+.crop-edit h2 small { font-weight: 400; color: #6b7280; font-size: 0.8rem; }
+.crop-edit h3 { font-size: 0.9rem; margin: 1.25rem 0 0.5rem; }
+.unreviewed { color: #b45309; font-size: 0.72rem; }
+
+table.stages { border-collapse: collapse; width: 100%; max-width: 620px; }
+table.stages th, table.stages td {
+  border: 1px solid #e5e7eb; padding: 0.35rem 0.5rem; text-align: left; font-size: 0.85rem;
+}
+table.stages th { background: #f3f4f6; font-weight: 600; }
+table.stages input {
+  width: 100%; border: none; padding: 0.2rem; font-size: 0.85rem; background: transparent;
+}
+table.stages input:focus { outline: 1px solid #16a34a; border-radius: 3px; }
+
+.sens-sum { font-size: 0.78rem; margin-top: 0.4rem; }
+.sens-sum.ok { color: #14532d; }
+.sens-sum.warn { color: #b45309; }
+
+.crop-edit button {
+  margin-top: 1.25rem; padding: 0.55rem 1rem; border: none; border-radius: 6px;
+  background: #14532d; color: #fff; font-size: 0.9rem; cursor: pointer;
+}
 
 .run {
   font-size: 0.78rem; padding: 0.45rem; border: 1px solid #e5e7eb; border-radius: 6px;
