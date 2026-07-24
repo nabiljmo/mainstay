@@ -43,6 +43,9 @@ export default function ProductDesign() {
   const [loadings, setLoadings] = useState(null)
   const [econ, setEcon] = useState(null)
   const [computing, setComputing] = useState(false)
+  const [edits, setEdits] = useState({}) // {zone: phases} — terms the actuary settled per zone
+  const [publishing, setPublishing] = useState(false)
+  const [published, setPublished] = useState(null)
 
   const loadDrafts = () => fetch(`${API}/products/drafts`).then((r) => r.json()).then(setDrafts).catch(() => {})
 
@@ -80,6 +83,8 @@ export default function ProductDesign() {
   const open = (id) => {
     fetch(`${API}/products/drafts/${id}`).then((r) => r.json()).then((def) => {
       setOpenDraft({ id, definition: def })
+      setEdits({})
+      setPublished(null)
       const firstZone = Object.keys(def.zones)[0]
       selectZone(id, def, firstZone)
     })
@@ -98,11 +103,18 @@ export default function ProductDesign() {
     if (!loadings) return
     const withMode = p.map((ph) => ({ ...ph, trigger_mode: mode }))
     setComputing(true)
+    setError(null)
     fetch(`${API}/products/drafts/${id}/zones/${z}/economics`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phases: withMode, distribution: distOverride || distribution, loadings }),
     })
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}))
+          throw new Error(body.detail || `Pricing failed (${r.status})`)
+        }
+        return r.json()
+      })
       .then((d) => {
         setEcon(d)
         setPricing({
@@ -112,12 +124,40 @@ export default function ProductDesign() {
           phase_meanings: d.phase_meanings,
           sum_insured: d.sum_insured,
         })
+        // Remember the settled terms for this zone so publishing freezes the
+        // actuary's edits, not just the original proposal.
+        setEdits((prev) => ({ ...prev, [z]: withMode }))
       })
-      .catch(() => {})
+      .catch((e) => setError(e.message))
       .finally(() => setComputing(false))
   }
 
   const priceEconomics = (id, z, p, distOverride) => price(id, z, p, distOverride)
+
+  const publishProduct = () => {
+    if (!openDraft) return
+    const nZones = Object.keys(openDraft.definition.zones).length
+    const reviewed = Object.keys(edits).length
+    const ok = window.confirm(
+      `Publish this product?\n\nThis freezes a read-only version across all ${nZones} zones ` +
+      `(${reviewed} reviewed this session) and makes it the quoting source. ` +
+      `Further changes require a new version.`,
+    )
+    if (!ok) return
+    setPublishing(true)
+    setError(null)
+    fetch(`${API}/products/drafts/${openDraft.id}/publish`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ distribution, loadings, zone_phases: edits, published_by: 'admin' }),
+    })
+      .then(async (r) => {
+        if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail || `Publish failed (${r.status})`) }
+        return r.json()
+      })
+      .then(setPublished)
+      .catch((e) => setError(e.message))
+      .finally(() => setPublishing(false))
+  }
 
   const editLoading = (i, field, value) => {
     const l = [...loadings]
@@ -180,6 +220,57 @@ export default function ProductDesign() {
 
       {openDraft && zone && (
         <div className="crop-edit">
+          {econ && (
+            <div className="premium-sticky">
+              <div>
+                <span className="ps-rate">{econ.price.premium_rate}%</span>
+                <span className="ps-sub">rate · zone {zone}</span>
+              </div>
+              <div>
+                <span className="ps-amt">{econ.price.gross_premium.toLocaleString()}</span>
+                <span className="ps-sub">premium on {econ.sum_insured.toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="ps-amt">{econ.economics.technical_el.toLocaleString()}</span>
+                <span className="ps-sub">expected loss</span>
+              </div>
+              <span className={`flag ${econ.quality_flag}`} title={`${econ.economics.n_years} years of data`} />
+              <button className="publish-btn" onClick={publishProduct} disabled={publishing}>
+                {publishing ? 'Publishing…' : 'Publish product'}
+              </button>
+            </div>
+          )}
+
+          {published && (
+            <div className="published-banner">
+              <div className="pb-head">
+                <strong>Published {published.id}</strong>
+                <span>version {published.version} · {published.n_zones} zones frozen · quoting source is now live</span>
+              </div>
+              <div className="pb-actions">
+                <a href={`${API}/products/published/${published.id}/assumption-sheet`} target="_blank" rel="noreferrer">
+                  Open assumption sheet (print → PDF)
+                </a>
+                <a href={`${API}/products/published/${published.id}`} target="_blank" rel="noreferrer">
+                  View frozen product (JSON)
+                </a>
+              </div>
+              <table className="stages pb-rates">
+                <thead><tr><th>Zone</th><th>Rate</th><th>Gross premium</th><th>Expected loss</th></tr></thead>
+                <tbody>
+                  {published.rates.map((r) => (
+                    <tr key={r.zone}>
+                      <td>Zone {r.zone}</td>
+                      <td><strong>{r.premium_rate}%</strong></td>
+                      <td>{r.gross_premium.toLocaleString()}</td>
+                      <td>{r.expected_loss.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <h2>{openDraft.definition.zones && `${Object.keys(openDraft.definition.zones).length} zones`} · plant {openDraft.definition.plant_start}</h2>
           <label style={{ maxWidth: 200 }}>Zone
             <select value={zone} onChange={(e) => selectZone(openDraft.id, openDraft.definition, e.target.value)}>
@@ -243,6 +334,7 @@ export default function ProductDesign() {
           <button onClick={() => price(openDraft.id, zone, phases)} disabled={computing}>
             {computing ? 'Computing…' : 'Recompute payouts'}
           </button>
+          {error && <div className="error">{error}</div>}
 
           {pricing && (
             <>

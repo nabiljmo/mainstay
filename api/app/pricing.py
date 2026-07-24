@@ -60,21 +60,30 @@ def expected_loss(
 
     fit_params = None
     qq = []
-    if len(positive) >= 2 and dist:
-        frozen, fit_params = _fit(dist, positive)
-        # Frequency-severity Monte Carlo, clipped to the cover limit.
-        rng = np.random.default_rng(seed)
-        occur = rng.random(n_sim) < freq
-        sev = np.clip(frozen.rvs(size=n_sim, random_state=rng), 0, sum_insured)
-        sims = np.where(occur, sev, 0.0)
-        modelled_el = float(sims.mean())
-        # Q-Q: sorted positive losses vs fitted quantiles at plotting positions.
-        s = np.sort(positive)
-        pp = (np.arange(1, len(s) + 1) - 0.5) / len(s)
-        theo = frozen.ppf(pp)
-        qq = [{"actual": float(a), "theoretical": float(t)} for a, t in zip(s, theo)]
+    # A fit needs ≥2 positive points *and* some spread — degenerate (near-
+    # identical) payouts make the MLE solver diverge. Either way we fall back
+    # to the burning cost, the same prudent default as too-few-points.
+    can_fit = len(positive) >= 2 and dist and float(np.ptp(positive)) > 0
+    if can_fit:
+        try:
+            frozen, fit_params = _fit(dist, positive)
+            # Frequency-severity Monte Carlo, clipped to the cover limit.
+            rng = np.random.default_rng(seed)
+            occur = rng.random(n_sim) < freq
+            sev = np.clip(frozen.rvs(size=n_sim, random_state=rng), 0, sum_insured)
+            sims = np.where(occur, sev, 0.0)
+            modelled_el = float(sims.mean())
+            # Q-Q: sorted positive losses vs fitted quantiles at plotting positions.
+            s = np.sort(positive)
+            pp = (np.arange(1, len(s) + 1) - 0.5) / len(s)
+            theo = frozen.ppf(pp)
+            qq = [{"actual": float(a), "theoretical": float(t)} for a, t in zip(s, theo)]
+        except Exception:
+            fit_params = None
+            qq = []
+            modelled_el = burning_cost
     else:
-        # Too few positive years to fit — fall back to burning cost.
+        # Too few (or spread-free) positive years to fit — fall back.
         modelled_el = burning_cost
 
     technical_el = max(burning_cost, modelled_el)

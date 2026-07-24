@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 
 from app.index_engine import (
+    DEFICIT,
     apportion_limits,
     default_cover_for,
     phase_from_dict,
@@ -128,6 +129,14 @@ def propose_product(
             if reference:
                 strike_pct = round(100 * strike / reference, 1)
                 exit_pct = round(100 * exit_ / reference, 1)
+                # Rounding to 1 dp can collapse the two percentages onto each
+                # other (or invert them) even when the absolute triggers are
+                # strictly ordered — which then fails validation in percent
+                # mode. Keep the strict ordering the cover type requires.
+                if cover == DEFICIT and strike_pct <= exit_pct:
+                    strike_pct = round(exit_pct + 0.1, 1)
+                elif cover != DEFICIT and exit_pct <= strike_pct:
+                    exit_pct = round(strike_pct + 0.1, 1)
                 trigger_mode = "percent"
             else:
                 strike_pct = exit_pct = None

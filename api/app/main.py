@@ -17,13 +17,14 @@ app = FastAPI(title="AEZ Creator & Weather Index Insurance Platform")
 @app.on_event("startup")
 def _bootstrap_schema() -> None:
     if settings.database_url:
-        from app import crops
+        from app import crops, publish
         from app.db import init_schema
 
         try:
             init_schema()
             crops.init_schema()
             crops.seed_if_empty()
+            publish.init_schema()
         except Exception:
             pass  # /health surfaces db state; don't block startup on a race
 
@@ -436,14 +437,7 @@ class PriceEconomicsRequest(BaseModel):
 def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest) -> dict:
     """Full pricing for one zone: expected loss + loadings -> commercial rate."""
     from app.db import connect
-    from app.explain import (
-        explain_expected_loss,
-        explain_loading,
-        explain_premium,
-    )
-    from app.pricing import DEFAULT_LOADINGS, apply_loadings, expected_loss
-    from app.products import historical_table
-    from app.zoning import quality_flag as _qflag
+    from app.economics import compute_zone_economics
 
     with connect() as conn:
         row = conn.execute(
@@ -453,7 +447,6 @@ def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest) -> dict
     if not row:
         raise HTTPException(404, f"No product draft {draft_id}")
     country, zone_map, years, definition = row
-    sum_insured = definition["sum_insured"]
 
     with connect() as conn:
         zrow = conn.execute(
@@ -461,52 +454,16 @@ def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest) -> dict
         ).fetchone()
     zone_geojson = zrow[0]
 
-    from app.explain import explain_burning_cost, explain_payout, explain_phase, explain_year
-    from app.index_engine import phase_from_dict as _pfd
-
-    table = historical_table(
-        _store(), country, years, zone_geojson, zone, req.phases,
-        definition["plant_start"], cache_key=draft_id,
-    )
-    losses = [r["total_payout"] for r in table]
-
-    # Payout-history explanations (previously the separate /price call).
-    resolved = {}
-    phase_meanings = []
-    for p in req.phases:
-        rp = _pfd({**p, "trigger_mode": p.get("trigger_mode", "absolute")})
-        resolved[rp.name] = rp
-        phase_meanings.append(
-            {"name": rp.name, "meaning": explain_phase(rp.name, rp.cover_type, p.get("reference"), rp.strike, rp.exit_, rp.limit)}
+    try:
+        return compute_zone_economics(
+            _store(), country, zone_geojson, years, definition["plant_start"],
+            definition["sum_insured"], zone, req.phases,
+            distribution=req.distribution, loadings=req.loadings, cache_key=draft_id,
         )
-    for yr in table:
-        for ph in yr["phases"]:
-            rp = resolved[ph["phase"]]
-            ph["why"] = explain_payout(yr["year"], rp.name, rp.cover_type, ph["index"], rp.strike, rp.exit_, ph["limit"], ph["payout"])
-        yr["summary"] = explain_year(yr["year"], yr["phases"], sum_insured)
-
-    econ = expected_loss(losses, sum_insured, dist=req.distribution)
-    loadings = req.loadings if req.loadings is not None else DEFAULT_LOADINGS
-    price = apply_loadings(econ["technical_el"], loadings, sum_insured)
-
-    return {
-        "zone": zone,
-        "sum_insured": sum_insured,
-        "quality_flag": _qflag(len(years)),
-        # payout-history block (drives the historical table + plain words)
-        "years": table,
-        "burning_cost": econ["burning_cost"],
-        "burning_cost_explanation": explain_burning_cost(econ["burning_cost"], sum_insured, len(table)),
-        "phase_meanings": phase_meanings,
-        # pricing block
-        "economics": econ,
-        "price": price,
-        "explanations": {
-            "expected_loss": explain_expected_loss(econ, sum_insured),
-            "premium": explain_premium(econ, price, sum_insured),
-            "loadings": [explain_loading(b, sum_insured) for b in price["loading_breakdown"]],
-        },
-    }
+    except ValueError as e:
+        # Invalid trigger terms (e.g. a strike edited past its exit) — send a
+        # readable 400 the UI can show, not an opaque 500.
+        raise HTTPException(400, str(e))
 
 
 @app.get("/pricing/defaults")
@@ -514,6 +471,68 @@ def pricing_defaults() -> dict:
     from app.pricing import DEFAULT_LOADINGS, DISTRIBUTIONS
 
     return {"loadings": DEFAULT_LOADINGS, "distributions": list(DISTRIBUTIONS)}
+
+
+# ---------------------------------------------------------------------------
+# Publish / registry (issue 011): freeze a draft into an immutable, versioned
+# product with a per-zone rate table and an exportable assumption sheet.
+# ---------------------------------------------------------------------------
+
+class PublishRequest(BaseModel):
+    distribution: str = "gamma"
+    loadings: list[dict]
+    zone_phases: dict | None = None  # {zone_id: phases} — the actuary's edits
+    published_by: str = "admin"
+
+
+@app.post("/products/drafts/{draft_id}/publish")
+def publish_draft(draft_id: str, req: PublishRequest) -> dict:
+    from app.publish import PublishError, publish_product
+
+    try:
+        return publish_product(
+            _store(), draft_id, req.distribution, req.loadings,
+            req.zone_phases, req.published_by,
+        )
+    except PublishError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/products/published")
+def list_published_products() -> list[dict]:
+    from app.publish import list_published
+
+    return list_published()
+
+
+@app.get("/products/published/{product_id}")
+def get_published_product(product_id: str) -> dict:
+    from app.publish import get_published
+
+    product = get_published(product_id)
+    if not product:
+        raise HTTPException(404, f"No published product {product_id}")
+    return product
+
+
+@app.get("/products/published/{product_id}/assumption-sheet")
+def published_assumption_sheet(product_id: str):
+    from fastapi.responses import HTMLResponse
+
+    from app.publish import get_published, render_assumption_sheet_html
+
+    product = get_published(product_id)
+    if not product:
+        raise HTTPException(404, f"No published product {product_id}")
+    return HTMLResponse(render_assumption_sheet_html(product))
+
+
+@app.get("/rates")
+def query_rates(country: str, crop: str, season: str, zone: int | None = None) -> list[dict]:
+    """The quoting source: latest published rates by (country, crop, season[, zone])."""
+    from app.publish import get_rates
+
+    return get_rates(country, crop, season, zone)
 
 
 @app.post("/jobs/demo")
