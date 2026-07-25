@@ -5,7 +5,7 @@
 
 ## Problem Statement
 
-The company designs weather index insurance for smallholder farmers across Africa. Today the workflow is fragmented and manual: agro-ecological zones are drawn by a standalone R script running on a retired package stack that no longer installs on modern machines; crop phenology knowledge lives in actuaries' heads and ad-hoc spreadsheets; index design and pricing happen in an external third-party tool (Swiss Re's Twister Re) that has no concept of zones or crops; and settlement is computed separately from pricing, opening the door to inconsistency between what was priced and what pays out.
+The company designs weather index insurance for smallholder farmers across Africa. Today the workflow is fragmented and manual: agro-ecological zones are drawn by a standalone R script running on a retired package stack that no longer installs on modern machines; crop phenology knowledge lives in actuaries' heads and ad-hoc spreadsheets; index design and pricing happen in an external third-party tool that has no concept of zones or crops; and settlement is computed separately from pricing, opening the door to inconsistency between what was priced and what pays out.
 
 The consequences: creating a product for a new country takes weeks of manual work across disconnected tools; nothing is versioned or auditable end-to-end; premium quotes cannot be produced instantly in the field; and the zoning method (3 years of data, mean rainfall only) is weaker than the data allows.
 
@@ -107,6 +107,5 @@ No prior art exists in this repository (greenfield); these tests establish the h
 
 - Pilot: Kenya, maize, long rains (March–June). Build sequence and milestones live in SPEC.md: data + zoning → crop library + index + pricing → quoting → binding → settlement (calendar-aligned to the first bound season's end).
 - Blind validation is a hard constraint: the company's internal Kenya maize rates exist but are withheld until the platform has priced independently. Do not request them; make every pricing assumption visible instead.
-- The Twister Re v1.5 User Guide (this folder) is the reference for pricing conventions (relevant-BC = max of burning cost and modelled EL; distribution options) — used for guidance, not copied.
 - CHIRPS cache needs tens of GB per country at full depth; cache location must be configurable (external drive).
 - The original R script's known defects (retired packages, O(n²) capping loop, path bugs, unsafe NA handling, independent x/y scaling) are documented in this conversation's history and must not be ported.
