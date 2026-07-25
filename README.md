@@ -1,8 +1,9 @@
-# AEZ Creator & Weather Index Insurance Platform
+# Mainstay — Weather Index Insurance Platform
 
-A web platform that creates agro-ecological zones for any African country from
-open CHIRPS rainfall data, and runs the full lifecycle of weather index
-insurance products: design → price → publish → quote → bind → settle.
+**Mainstay** is a web platform that creates agro-ecological zones for any
+African country from open CHIRPS rainfall data, and runs the full lifecycle of
+weather index insurance products: design → price → publish → quote → bind →
+settle. The name is the promise to the farmer: a mainstay when the rains fail.
 
 - **Specification:** [SPEC.md](SPEC.md) — every agreed design decision.
 - **PRD:** [PRD.md](PRD.md) — problem, user stories, modules, testing.

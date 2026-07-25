@@ -11,7 +11,7 @@ from app.countries import COUNTRIES
 from app.weather import WeatherStore
 from app.worker import celery_app, demo_job, draft_product, fetch_weather, zoning_run
 
-app = FastAPI(title="AEZ Creator & Weather Index Insurance Platform")
+app = FastAPI(title="Mainstay — Weather Index Insurance Platform")
 
 
 @app.on_event("startup")

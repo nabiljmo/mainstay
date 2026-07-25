@@ -258,7 +258,7 @@ def list_demand_signals(country: str | None = None) -> list[dict]:
 AGENT_PAGE = """<!doctype html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Get a weather-insurance quote</title>
+<title>Mainstay — get a quote</title>
 <style>
   *{box-sizing:border-box;margin:0}
   body{font-family:system-ui,sans-serif;background:#eef3fa;color:#0f1f33;
@@ -294,7 +294,7 @@ AGENT_PAGE = """<!doctype html><html lang="en"><head>
   .qflag.green{background:#dcfce7;color:#14532d}
   .msg{font-size:.95rem;color:#92400e}
 </style></head><body>
-<header><h1>Weather insurance quote</h1><p>Pin the farm, pick a crop, see the premium.</p></header>
+<header><h1>Mainstay</h1><p>Weather cover for your farm — pin it, pick a crop, see the premium.</p></header>
 
 <div id="login">
   <label for="u">Username<input id="u" autocomplete="username"></label>

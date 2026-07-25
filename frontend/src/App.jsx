@@ -172,7 +172,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>AEZ Creator &amp; Weather Index Insurance Platform</h1>
+        <h1>Mainstay</h1>
         <nav className="tabs">
           {tabs.map((t) => (
             <button key={t.key} className={view === t.key ? 'on' : ''} onClick={() => setView(t.key)}>

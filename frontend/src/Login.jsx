@@ -28,8 +28,8 @@ export default function Login({ onLogin }) {
   return (
     <div className="login-screen">
       <form className="login-card" onSubmit={submit}>
-        <h1>AEZ Creator</h1>
-        <p className="login-sub">Weather Index Insurance Platform</p>
+        <h1>Mainstay</h1>
+        <p className="login-sub">Weather index insurance — your mainstay when the rains fail</p>
         <label>Username
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
         </label>
