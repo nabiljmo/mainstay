@@ -17,7 +17,7 @@ app = FastAPI(title="Mainstay — Weather Index Insurance Platform")
 @app.on_event("startup")
 def _bootstrap_schema() -> None:
     if settings.database_url:
-        from app import auth, crops, policies, publish, quotes, settlement
+        from app import auth, crops, payout, policies, publish, quotes, settlement
         from app.db import init_schema
 
         try:
@@ -28,6 +28,7 @@ def _bootstrap_schema() -> None:
             quotes.init_schema()
             policies.init_schema()
             settlement.init_schema()
+            payout.init_schema()
             auth.init_schema()
             auth.seed_admin()
         except Exception:
@@ -849,6 +850,78 @@ def settlement_run(req: SettlementRunRequest, _: dict = Depends(OPERATIONS)) -> 
 
     return run_settlement_sweep(
         _store(), product_id=req.product_id, season_year=req.season_year
+    )
+
+
+# ---------------------------------------------------------------------------
+# Payout run (issue 017): season close. Review the settled season (totals,
+# farmer count, largest amounts, per-zone table, >3x-EL anomaly flags), then one
+# human clicks Release — the run locks, policies flip to settled, and a payout
+# file (phone, amount, policy, zone, index evidence) exports for the rails.
+# ---------------------------------------------------------------------------
+
+@app.get("/payouts/run")
+def payout_run_review(product_id: str, season_year: int | None = None,
+                      _: dict = Depends(OPERATIONS)) -> dict:
+    from app.payout import PayoutError, build_payout_run
+
+    try:
+        return build_payout_run(product_id, season_year)
+    except PayoutError as e:
+        raise HTTPException(404, str(e))
+
+
+class ReleaseRequest(BaseModel):
+    product_id: str
+    season_year: int | None = None
+    confirm: bool = False
+
+
+@app.post("/payouts/release")
+def payout_release(req: ReleaseRequest, user: dict = Depends(OPERATIONS)) -> dict:
+    """Release the season's payout file. Requires explicit confirmation; the run
+    locks after release and cannot be released again."""
+    from app.payout import PayoutError, release_payout_run
+
+    if not req.confirm:
+        raise HTTPException(400, "release must be explicitly confirmed")
+    try:
+        return release_payout_run(req.product_id, req.season_year, user["username"])
+    except PayoutError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/payouts/runs")
+def payout_runs_list(product_id: str | None = None,
+                     _: dict = Depends(OPERATIONS)) -> list[dict]:
+    from app.payout import list_runs
+
+    return list_runs(product_id)
+
+
+@app.get("/payouts/runs/{run_id}")
+def payout_run_get(run_id: str, _: dict = Depends(OPERATIONS)) -> dict:
+    from app.payout import get_run
+
+    run = get_run(run_id)
+    if not run:
+        raise HTTPException(404, f"no payout run {run_id}")
+    return run
+
+
+@app.get("/payouts/runs/{run_id}/file")
+def payout_run_file(run_id: str, _: dict = Depends(OPERATIONS)):
+    """The disbursement CSV for the payment rails (documented columns)."""
+    from fastapi.responses import PlainTextResponse
+
+    from app.payout import get_run, render_payout_file
+
+    if not get_run(run_id):
+        raise HTTPException(404, f"no payout run {run_id}")
+    csv_text = render_payout_file(run_id)
+    return PlainTextResponse(
+        csv_text, media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{run_id}.csv"'},
     )
 
 
