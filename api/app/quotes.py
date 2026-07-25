@@ -280,6 +280,9 @@ AGENT_PAGE = """<!doctype html><html lang="en"><head>
        font-size:1.05rem;font-weight:700;padding:.85rem;border-radius:9px;
        margin-top:1.2rem;cursor:pointer;box-shadow:0 2px 8px rgba(29,155,240,.3)}
   #go:disabled{background:#c6cfdb;box-shadow:none}
+  .buy{background:linear-gradient(180deg,#1d9bf0,#0d84d6);color:#fff;border:none;width:100%;
+       font-size:1rem;font-weight:700;padding:.75rem;border-radius:9px;margin-top:1rem;cursor:pointer}
+  .buy:disabled{background:#c6cfdb}
   .card{margin-top:1.2rem;background:#fff;border-radius:12px;padding:1.1rem;
        box-shadow:0 6px 18px rgba(16,31,51,.1)}
   .card.ok{border-top:4px solid #15a34a}
@@ -386,15 +389,58 @@ document.getElementById('go').addEventListener('click',function(){
   .finally(function(){btn.disabled=false;btn.textContent='Get quote';refresh()});
 });
 
+function val(id){return document.getElementById(id).value.trim()}
 function render(q){var el=document.getElementById('result');
-  if(q.status==='quoted'){
-    el.innerHTML='<div class="card ok"><div class="premium">'+q.premium.toLocaleString()+
-      ' <small>premium</small></div><div class="ref">'+q.reference+' · zone '+q.zone+
-      ' · rate '+q.premium_rate+'%</div><div class="sum">'+q.cover_summary+'</div>'+
-      '<div class="qflag '+q.quality_flag+'">data quality: '+q.quality_flag+'</div></div>';
-  } else {
-    el.innerHTML='<div class="card no"><div class="msg">'+q.message+'</div></div>';
-  }
+  if(q.status!=='quoted'){el.innerHTML='<div class="card no"><div class="msg">'+q.message+'</div></div>';return}
+  el.innerHTML='<div class="card ok"><div class="premium">'+q.premium.toLocaleString()+
+    ' <small>premium</small></div><div class="ref">'+q.reference+' · zone '+q.zone+
+    ' · rate '+q.premium_rate+'%</div><div class="sum">'+q.cover_summary+'</div>'+
+    '<div class="qflag '+q.quality_flag+'">data quality: '+q.quality_flag+'</div>'+
+    '<button class="buy" id="buy">Buy this cover</button></div><div id="bindbox"></div>';
+  document.getElementById('buy').addEventListener('click',function(){startBind(q)});
+}
+function startBind(q){
+  document.getElementById('bindbox').innerHTML='<div class="card">'+
+    '<label>Farmer name<input id="fname" autocomplete="name"></label>'+
+    '<label>Phone<input id="fphone" inputmode="tel"></label>'+
+    '<label>Gender<select id="fgender"><option value="">—</option>'+
+      '<option value="F">Female</option><option value="M">Male</option></select></label>'+
+    '<label>National ID (optional)<input id="fid"></label>'+
+    '<button class="buy" id="dobind">Bind policy</button>'+
+    '<div class="msg" id="binderr"></div></div>';
+  document.getElementById('dobind').addEventListener('click',function(){doBind(q)});
+}
+function doBind(q){
+  var f={name:val('fname'),phone:val('fphone'),gender:val('fgender'),national_id:val('fid')};
+  if(!f.name||!f.phone){document.getElementById('binderr').textContent='Name and phone are required.';return}
+  var btn=document.getElementById('dobind');btn.disabled=true;btn.textContent='Binding…';
+  fetch('/policies',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({sale_type:'individual',entries:[{quote_reference:q.reference,farmer:f}]})})
+  .then(function(r){if(!r.ok)return r.json().then(function(b){throw new Error(b.detail||'Bind failed')});return r.json()})
+  .then(showPolicy)
+  .catch(function(e){document.getElementById('binderr').textContent=e.message})
+  .finally(function(){btn.disabled=false;btn.textContent='Bind policy'});
+}
+function showPolicy(p){
+  document.getElementById('bindbox').innerHTML='<div class="card ok">'+
+    '<strong>Policy '+p.id+'</strong>'+
+    '<div class="ref">status: '+p.status+' · premium '+p.total_premium.toLocaleString()+'</div>'+
+    '<label>Payment reference (M-Pesa etc.)<input id="rcpt"></label>'+
+    '<button class="buy" id="dorcpt">Record payment &amp; activate</button>'+
+    '<div class="msg" id="rcpterr"></div></div>';
+  document.getElementById('dorcpt').addEventListener('click',function(){doReceipt(p.id)});
+}
+function doReceipt(id){
+  var ref=val('rcpt'); if(!ref){document.getElementById('rcpterr').textContent='Enter the payment reference.';return}
+  var btn=document.getElementById('dorcpt');btn.disabled=true;btn.textContent='Recording…';
+  fetch('/policies/'+id+'/receipt',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({reference:ref})})
+  .then(function(r){if(!r.ok)return r.json().then(function(b){throw new Error(b.detail||'Failed')});return r.json()})
+  .then(function(p){document.getElementById('bindbox').innerHTML='<div class="card ok">'+
+    '<strong>✓ Policy '+p.id+' is active</strong>'+
+    '<div class="sum">Cover is live. Payment reference '+p.receipt_ref+' recorded.</div></div>'})
+  .catch(function(e){document.getElementById('rcpterr').textContent=e.message})
+  .finally(function(){btn.disabled=false;btn.textContent='Record payment &amp; activate'});
 }
 }
 </script>

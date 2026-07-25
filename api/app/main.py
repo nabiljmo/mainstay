@@ -17,7 +17,7 @@ app = FastAPI(title="Mainstay — Weather Index Insurance Platform")
 @app.on_event("startup")
 def _bootstrap_schema() -> None:
     if settings.database_url:
-        from app import auth, crops, publish, quotes
+        from app import auth, crops, policies, publish, quotes
         from app.db import init_schema
 
         try:
@@ -26,6 +26,7 @@ def _bootstrap_schema() -> None:
             crops.seed_if_empty()
             publish.init_schema()
             quotes.init_schema()
+            policies.init_schema()
             auth.init_schema()
             auth.seed_admin()
         except Exception:
@@ -716,6 +717,104 @@ def agent_page():
     from app.quotes import AGENT_PAGE
 
     return HTMLResponse(AGENT_PAGE)
+
+
+# ---------------------------------------------------------------------------
+# Binding / policy register (issue 015): quotes -> master policy + schedule of
+# farmers (PII encrypted at rest); premium receipt activates the policy.
+# ---------------------------------------------------------------------------
+
+class BindEntry(BaseModel):
+    quote_reference: str | None = None
+    zone: int | None = None
+    sum_insured: float | None = None
+    farmer: dict  # {name, phone, gender?, national_id?}
+
+
+class BindRequest(BaseModel):
+    sale_type: str = "individual"
+    partner_name: str | None = None
+    product_id: str | None = None
+    entries: list[BindEntry]
+
+
+@app.post("/policies")
+def bind_policy_endpoint(req: BindRequest, user: dict = Depends(AGENT)) -> dict:
+    from app.policies import BindError, bind_policy
+
+    try:
+        return bind_policy(
+            req.sale_type, req.partner_name, req.product_id,
+            [e.model_dump() for e in req.entries], user["username"],
+        )
+    except BindError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/policies")
+def list_policies_endpoint(
+    partner: str | None = None, product_id: str | None = None,
+    status: str | None = None, agent: str | None = None, zone: int | None = None,
+    user: dict = Depends(AUTHED),
+) -> list[dict]:
+    """Register: an agent sees only their own policies; operations/admin see all
+    and can filter by partner, product, agent, status and zone."""
+    from app.policies import list_policies
+
+    scoped = None if user["role"] in ("operations", "admin") else user["username"]
+    return list_policies(scoped, partner=partner, product_id=product_id,
+                         status=status, agent=agent, zone=zone)
+
+
+def _policy_or_403(policy_id: str, user: dict):
+    from app.policies import get_master
+
+    master = get_master(policy_id)
+    if not master:
+        raise HTTPException(404, f"No policy {policy_id}")
+    if user["role"] not in ("operations", "admin") and master["created_by"] != user["username"]:
+        raise HTTPException(403, "Not your policy")
+    return master
+
+
+@app.get("/policies/{policy_id}")
+def get_policy_endpoint(policy_id: str, user: dict = Depends(AUTHED)) -> dict:
+    from app.policies import get_policy
+
+    _policy_or_403(policy_id, user)
+    return get_policy(policy_id)
+
+
+class ReceiptRequest(BaseModel):
+    reference: str
+    date: str | None = None
+
+
+@app.post("/policies/{policy_id}/receipt")
+def policy_receipt_endpoint(policy_id: str, req: ReceiptRequest,
+                            user: dict = Depends(AUTHED)) -> dict:
+    from app.policies import BindError, record_receipt
+
+    _policy_or_403(policy_id, user)
+    try:
+        return record_receipt(policy_id, req.reference, req.date)
+    except BindError as e:
+        raise HTTPException(400, str(e))
+
+
+class StatusRequest(BaseModel):
+    status: str
+
+
+@app.post("/policies/{policy_id}/status")
+def policy_status_endpoint(policy_id: str, req: StatusRequest,
+                           _: dict = Depends(OPERATIONS)) -> dict:
+    from app.policies import BindError, set_status
+
+    try:
+        return set_status(policy_id, req.status)
+    except BindError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.post("/jobs/demo")

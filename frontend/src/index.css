@@ -463,3 +463,11 @@ button.del:hover { background: var(--danger-soft); box-shadow: none; transform: 
   justify-content: center; color: var(--text-muted); }
 .empty-role a { color: var(--accent-deep); font-weight: 600; text-decoration: none; }
 .empty-role a:hover { text-decoration: underline; }
+
+/* policy status badges */
+.pstatus { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  padding: 0.12rem 0.5rem; border-radius: 99px; }
+.pstatus.draft { background: var(--surface-3); color: var(--text-muted); }
+.pstatus.active { background: var(--positive-soft); color: #15803d; }
+.pstatus.expired { background: var(--warn-soft); color: #92400e; }
+.pstatus.settled { background: var(--accent-soft); color: var(--accent-deep); }
