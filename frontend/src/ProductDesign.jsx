@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { API } from './config.js'
+import { API, errText } from './config.js'
 
 function QQPlot({ qq }) {
   const W = 260, H = 160, pad = 30
@@ -28,7 +28,7 @@ export default function ProductDesign() {
   const [crops, setCrops] = useState([])
   const [drafts, setDrafts] = useState([])
   const [form, setForm] = useState({
-    zone_map: '', crop: 'maize', crop_version: 1, season: 'long_rains',
+    zone_map: '', country: 'KEN', crop: 'maize', crop_version: 1, season: 'long_rains',
     start_year: 2021, end_year: 2025, sum_insured: 10000,
   })
   const [job, setJob] = useState(null)
@@ -52,9 +52,12 @@ export default function ProductDesign() {
   useEffect(() => {
     fetch(`${API}/zone-maps?country=KEN`).then((r) => r.json()).then((m) => {
       setMaps(m)
-      if (m.length) setForm((f) => ({ ...f, zone_map: m[0].name }))
+      if (m.length) setForm((f) => ({ ...f, zone_map: m[0].name, country: m[0].country || f.country }))
     })
-    fetch(`${API}/crops`).then((r) => r.json()).then(setCrops)
+    fetch(`${API}/crops`).then((r) => r.json()).then((cs) => {
+      setCrops(cs)
+      if (cs.length) setForm((f) => ({ ...f, crop: cs[0].crop, crop_version: cs[0].version }))
+    })
     fetch(`${API}/pricing/defaults`).then((r) => r.json()).then((d) => setLoadings(d.loadings))
     loadDrafts()
   }, [])
@@ -75,7 +78,7 @@ export default function ProductDesign() {
     fetch(`${API}/products/draft`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
     })
-      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).detail); return r.json() })
+      .then(async (r) => { if (!r.ok) throw new Error(errText((await r.json()).detail)); return r.json() })
       .then((d) => setJob({ id: d.job_id, state: 'PENDING' }))
       .catch((e) => setError(e.message))
   }
@@ -191,7 +194,10 @@ export default function ProductDesign() {
           </select>
         </label>
         <label>Crop
-          <select value={form.crop} onChange={(e) => setForm({ ...form, crop: e.target.value })}>
+          <select value={form.crop} onChange={(e) => {
+            const c = crops.find((x) => x.crop === e.target.value)
+            setForm({ ...form, crop: e.target.value, crop_version: c?.version ?? form.crop_version })
+          }}>
             {crops.map((c) => <option key={c.crop} value={c.crop}>{c.crop} v{c.version}</option>)}
           </select>
         </label>
