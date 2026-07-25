@@ -1,6 +1,6 @@
 # AEZ Creator & Weather Index Insurance Platform — Agreed Specification
 
-*Product of a structured design interview, 24 July 2026. Every decision below was explicitly agreed. Reference material: the Nigeria K-means zoning R script and the Swiss Re Twister Re v1.5 User Guide (in this folder).*
+*Product of a structured design interview, 24 July 2026. Every decision below was explicitly agreed.*
 
 ## 1. Product shape
 
@@ -43,7 +43,7 @@
 
 ## 6. Pricing & publishing
 
-- Per zone: index computed for each historical year → **burning cost** (over chosen window) and **modelled expected loss** (fitted distribution: gamma default; normal/lognormal options; Q-Q plot shown; simulation). **Technical EL = max(BC, model)** (Twister convention).
+- Per zone: index computed for each historical year → **burning cost** (over chosen window) and **modelled expected loss** (fitted distribution: gamma default; normal/lognormal options; Q-Q plot shown; simulation). **Technical EL = max(BC, model)**.
 - No detrending, no tail blow-up factors in v1 (both shown as v2 candidates).
 - **Loadings: flexible itemised list.** Recommended default set offered; actuary freely adds/edits/removes named loadings. Each line has a basis: % of EL, % of gross premium, or flat per policy. System handles gross-up math correctly: gross = EL ÷ (1 − Σ %-of-gross loadings).
 - **No maker-checker.** The building actuary publishes, via an explicit "make this quotable" confirmation. Publishing writes a full audit record (who, when, every parameter) and **freezes the product as a read-only version**. Changes = new version.
