@@ -6,7 +6,7 @@
 
 - **Core:** an expert actuarial workbench. Actuaries create zones, design indices, price, and publish products.
 - **Quoting is a read-only lookup** against published products — never on-the-fly computation. Flow: expert designs → publishes → anyone quotes.
-- **Audiences in order:** the company actuaries (workbench) → field agents + partner APIs (quoting) → farmer-direct (later; USSD/WhatsApp out of scope for v1).
+- **Audiences in order:** Company actuaries (workbench) → field agents + partner APIs (quoting) → farmer-direct (later; USSD/WhatsApp out of scope for v1).
 - **Scope: full lifecycle** — quote, bind, and settle — built in that sequence.
 
 ## 2. Weather data
@@ -30,7 +30,7 @@
 
 - **In-app, versioned, editable library** — first-class product data, not code.
 - Per crop: growth stages, durations, water-stress sensitivity weights. Per country: planting window(s).
-- **Seeded from FAO sources** (crop calendars, stage/water-requirement literature); reviewed by the company agronomists before first use; every edit attributed.
+- **Seeded from FAO sources** (crop calendars, stage/water-requirement literature); reviewed by company agronomists before first use; every edit attributed.
 - Products record the crop-library version they were priced with.
 - **Fixed calendar phases in v1.** Phase start is implemented as a swappable rule so **dynamic (rainfall-triggered) onset arrives in v2** without rework.
 
@@ -61,7 +61,7 @@
 
 - **Two-level register from day one:** master policy (e.g. partner/bank group deal) + schedule of farmers beneath it. An individual sale = master policy with one farmer. Both cases confirmed real at the company.
 - **Minimal PII:** name, phone (identity + payment address), gender, optional national ID per country KYC. Location/crop come from the quote. Encrypted at rest; role-scoped access (agents see only their own book).
-- **Money is recorded, never moved.** Premium collection happens in existing the company/partner channels; system records status and activates the policy. Same at payout: system produces the file; existing rails disburse.
+- **Money is recorded, never moved.** Premium collection happens in existing company/partner channels; system records status and activates the policy. Same at payout: system produces the file; existing rails disburse.
 
 ## 9. Settlement
 
@@ -83,7 +83,7 @@
 
 - **Kenya, maize.** Assumed **long rains** season unless stated otherwise (Kenya products are per season; the zone map is per country and unaffected).
 - Engine validation: run ported clustering vs the R method on identical inputs; confirm agreement before trusting downstream.
-- Then: full-history Kenya zone map → FAO Kenya maize phenology into crop library → design + price a long-rains drought product → compare rates against an existing the company Kenya product if available.
+- Then: full-history Kenya zone map → FAO Kenya maize phenology into crop library → design + price a long-rains drought product → compare rates against an existing internal Kenya product if available.
 
 ## Build sequence
 
@@ -96,7 +96,7 @@
 ## Open items — all resolved (24 July 2026)
 
 1. **Settlement dataset:** no reinsurer mandate. CHIRPS confirmed as both pricing and settlement dataset.
-2. **Handoff to existing the company systems:** out of scope — not applicable. API-only interface stands.
+2. **Handoff to existing internal systems:** out of scope — not applicable. API-only interface stands.
 3. **In-season payouts:** none promised anywhere. One payment per farmer at season end, confirmed.
 4. **Pricing benchmark:** exists, but deliberately withheld — **blind validation**. The system prices Kenya maize long rains independently; the company compares against internal rates afterwards. Consequence for the build: the pricing output must print every assumption (dataset, years, zone map version, crop-library version, triggers, distribution, loadings) so any gap found in comparison is traceable to a cause.
 5. **Pilot season: long rains** (roughly March–June), Kenya, maize. Confirmed.

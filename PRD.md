@@ -5,7 +5,7 @@
 
 ## Problem Statement
 
-the company designs weather index insurance for smallholder farmers across Africa. Today the workflow is fragmented and manual: agro-ecological zones are drawn by a standalone R script running on a retired package stack that no longer installs on modern machines; crop phenology knowledge lives in actuaries' heads and ad-hoc spreadsheets; index design and pricing happen in an external third-party tool (Swiss Re's Twister Re) that has no concept of zones or crops; and settlement is computed separately from pricing, opening the door to inconsistency between what was priced and what pays out.
+The company designs weather index insurance for smallholder farmers across Africa. Today the workflow is fragmented and manual: agro-ecological zones are drawn by a standalone R script running on a retired package stack that no longer installs on modern machines; crop phenology knowledge lives in actuaries' heads and ad-hoc spreadsheets; index design and pricing happen in an external third-party tool (Swiss Re's Twister Re) that has no concept of zones or crops; and settlement is computed separately from pricing, opening the door to inconsistency between what was priced and what pays out.
 
 The consequences: creating a product for a new country takes weeks of manual work across disconnected tools; nothing is versioned or auditable end-to-end; premium quotes cannot be produced instantly in the field; and the zoning method (3 years of data, mean rainfall only) is weaker than the data allows.
 
@@ -73,7 +73,7 @@ The platform is organised around deep modules — engines with small, stable, te
 
 Architecture: Python backend (FastAPI), PostgreSQL + PostGIS as the single database, Celery background workers for all slow jobs, React + MapLibre frontend with a separate ultra-light agent quote page, all composed via Docker. Runs locally first; deploys unchanged to the owner's server.
 
-Key product decisions carried in from the specification: CHIRPS is both pricing and settlement dataset (no reinsurer mandate); one zone map per country shared across crops and seasons; quoting is lookup-only against published products; no maker-checker on publishing (confirmation + audit instead); one payment per farmer at season end; settlement on final CHIRPS only (~3-week lag, printed into terms); no integration with external the company systems (API-only boundary).
+Key product decisions carried in from the specification: CHIRPS is both pricing and settlement dataset (no reinsurer mandate); one zone map per country shared across crops and seasons; quoting is lookup-only against published products; no maker-checker on publishing (confirmation + audit instead); one payment per farmer at season end; settlement on final CHIRPS only (~3-week lag, printed into terms); no integration with external company systems (API-only boundary).
 
 ## Testing Decisions
 
@@ -100,7 +100,7 @@ No prior art exists in this repository (greenfield); these tests establish the h
 - Manual zone-boundary editing — approval gate and admin-snap only in v1.
 - Staggered/step payout structures and stacked structures per phase.
 - In-season or per-phase payouts — one payment per farmer at season end.
-- Integration with existing the company internal systems — explicitly excluded by the owner; the API is the boundary.
+- Integration with existing internal company systems — explicitly excluded by the owner; the API is the boundary.
 - Photos, biometrics, household surveys in the policy register.
 
 ## Further Notes

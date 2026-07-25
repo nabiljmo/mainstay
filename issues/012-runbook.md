@@ -87,7 +87,7 @@ Do this per zone; the sticky bar shows the live rate as you work.
 For every material gap, attribute it to one cause. Do not "fix" a rate to match —
 explain the difference. Use the assumption sheet as the evidence.
 
-| Zone | Platform rate | the company rate | Gap (pp) | Attributed cause | Evidence / note |
+| Zone | Platform rate | Internal rate | Gap (pp) | Attributed cause | Evidence / note |
 |-----:|--------------:|----------:|---------:|------------------|-----------------|
 |  1   |               |           |          |                  |                 |
 |  …   |               |           |          |                  |                 |
