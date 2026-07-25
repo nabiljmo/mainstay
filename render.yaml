@@ -30,7 +30,10 @@ services:
     dockerfilePath: ./api/Dockerfile
     dockerContext: ./api
     dockerCommand: ./start-prod.sh
-    plan: starter
+    # Standard (2 GB) not Starter (512 MB): this one service runs the API +
+    # Celery worker + beat, each loading the numpy/scipy/scikit-learn/rasterio
+    # stack — 512 MB OOMs on boot.
+    plan: standard
     healthCheckPath: /health
     disk:
       name: weather-cache
