@@ -52,12 +52,12 @@ class Fetcher:
 
 
 @pytest.fixture
-def env(monkeypatch, tmp_path):
+def env(monkeypatch, tmp_path, login):
     """DB (or skip) + a published TST product; yields (client, version)."""
     monkeypatch.setattr(settings, "database_url", DB_URL)
     monkeypatch.setattr(settings, "weather_cache_dir", str(tmp_path))
     try:
-        from app import crops, publish, quotes
+        from app import auth, crops, publish, quotes
         from app.db import connect, init_schema
 
         init_schema()
@@ -65,6 +65,7 @@ def env(monkeypatch, tmp_path):
         crops.seed_if_empty()
         publish.init_schema()
         quotes.init_schema()
+        auth.init_schema()
     except Exception:
         pytest.skip("PostgreSQL not reachable — run `docker compose up db`")
 
@@ -97,9 +98,9 @@ def env(monkeypatch, tmp_path):
     from app.main import app
 
     client = TestClient(app)
+    login(client, "admin")  # publish + quote + demand-signal routes are role-gated
     pub = client.post(f"/products/drafts/{draft_id}/publish",
-                      json={"distribution": "gamma", "loadings": DEFAULT_LOADINGS,
-                            "published_by": "pytest"}).json()
+                      json={"distribution": "gamma", "loadings": DEFAULT_LOADINGS}).json()
 
     yield client, pub, tmp_path
 
@@ -110,6 +111,7 @@ def env(monkeypatch, tmp_path):
         conn.execute("DELETE FROM published_products WHERE country = 'TST'")
         conn.execute("DELETE FROM product_drafts WHERE country = 'TST'")
         conn.execute("DELETE FROM zone_map_versions WHERE name = %s", (zm_name,))
+        conn.execute("DELETE FROM users WHERE created_by = 'test'")
 
 
 def _quote(client, pin, **over):

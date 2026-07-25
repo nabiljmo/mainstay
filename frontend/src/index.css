@@ -411,3 +411,55 @@ button.del:hover { background: var(--danger-soft); box-shadow: none; transform: 
 .cached { margin-top: 1.35rem; }
 .cached h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 0.55rem; }
 .cached p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+
+/* ---------- auth ---------- */
+.app-loading { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--text-muted); }
+
+.login-screen {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(1100px 560px at 100% -12%, var(--accent-softer), transparent 58%),
+    radial-gradient(900px 520px at -12% 112%, #e6f0fb, transparent 55%), var(--bg);
+}
+.login-card {
+  width: 340px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 1.75rem;
+  border-top: 3px solid var(--accent);
+}
+.login-card h1 { font-size: 1.3rem; font-weight: 700; }
+.login-sub { font-size: 0.82rem; color: var(--text-muted); margin: 0.15rem 0 1.2rem; }
+.login-card label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-bottom: 0.9rem; }
+.login-card input {
+  display: block; width: 100%; margin-top: 0.3rem; padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-xs); font-size: 0.95rem;
+}
+.login-card input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.login-card button {
+  width: 100%; margin-top: 0.4rem; padding: 0.65rem; border: none; border-radius: var(--radius-xs);
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong)); color: #fff;
+  font-weight: 600; font-size: 0.95rem; cursor: pointer; box-shadow: 0 2px 8px rgba(29, 155, 240, 0.28);
+}
+.login-card button:disabled { background: #c6cfdb; box-shadow: none; cursor: default; }
+
+.user-chip {
+  display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem;
+  padding-left: 0.9rem; margin-left: 0.4rem; border-left: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.user-chip em { font-style: normal; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--navy-1); background: var(--accent-onDark); padding: 0.1rem 0.4rem; border-radius: 99px; }
+.user-chip .logout {
+  background: rgba(255, 255, 255, 0.12); color: #fff; border: none; border-radius: 6px;
+  padding: 0.3rem 0.7rem; font-size: 0.78rem; cursor: pointer;
+}
+.user-chip .logout:hover { background: rgba(255, 255, 255, 0.22); }
+
+.badge-on { font-size: 0.72rem; font-weight: 600; color: #15803d; background: var(--positive-soft);
+  padding: 0.12rem 0.5rem; border-radius: 99px; }
+.badge-off { font-size: 0.72rem; font-weight: 600; color: #92400e; background: var(--warn-soft);
+  padding: 0.12rem 0.5rem; border-radius: 99px; }
+
+.empty-role { flex: 1; display: flex; flex-direction: column; gap: 0.6rem; align-items: center;
+  justify-content: center; color: var(--text-muted); }
+.empty-role a { color: var(--accent-deep); font-weight: 600; text-decoration: none; }
+.empty-role a:hover { text-decoration: underline; }

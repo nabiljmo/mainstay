@@ -53,20 +53,21 @@ class Fetcher:
 
 
 @pytest.fixture
-def env(monkeypatch, tmp_path):
+def env(monkeypatch, tmp_path, login):
     """A live DB (or skip) + synthetic weather + an approved zone map + a draft.
     Yields (client, draft_id). Cleans up every TST row afterwards."""
     monkeypatch.setattr(settings, "database_url", DB_URL)
     monkeypatch.setattr(settings, "weather_cache_dir", str(tmp_path))
 
     try:
-        from app import crops, publish
+        from app import auth, crops, publish
         from app.db import connect, init_schema
 
         init_schema()
         crops.init_schema()
         crops.seed_if_empty()
         publish.init_schema()
+        auth.init_schema()
     except Exception:
         pytest.skip("PostgreSQL not reachable — run `docker compose up db`")
 
@@ -104,13 +105,16 @@ def env(monkeypatch, tmp_path):
 
     from app.main import app
 
-    yield TestClient(app), draft_id, definition
+    client = TestClient(app)
+    login(client, "admin")  # publish/read routes are role-gated now
+    yield client, draft_id, definition
 
     with connect() as conn:
         conn.execute("DELETE FROM published_rates WHERE country = 'TST'")
         conn.execute("DELETE FROM published_products WHERE country = 'TST'")
         conn.execute("DELETE FROM product_drafts WHERE country = 'TST'")
         conn.execute("DELETE FROM zone_map_versions WHERE name = %s", (zm_name,))
+        conn.execute("DELETE FROM users WHERE created_by = 'test'")
 
 
 def _publish(client, draft_id, **over):

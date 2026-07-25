@@ -217,6 +217,26 @@ def get_quote(reference: str) -> dict | None:
     }
 
 
+def list_quotes(created_by: str | None = None) -> list[dict]:
+    """Quotes, optionally scoped to one creator (an agent sees only their own)."""
+    sql = ("SELECT reference, product_id, product_version, country, crop, season, "
+           "zone, admin_area, sum_insured, premium_rate, premium, created_by, created_at "
+           "FROM quotes")
+    params: list = []
+    if created_by is not None:
+        sql += " WHERE created_by = %s"
+        params.append(created_by)
+    sql += " ORDER BY created_at DESC"
+    with connect() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [
+        {"reference": r[0], "product_id": r[1], "product_version": r[2], "country": r[3],
+         "crop": r[4], "season": r[5], "zone": r[6], "admin_area": r[7], "sum_insured": r[8],
+         "premium_rate": r[9], "premium": r[10], "created_by": r[11], "created_at": r[12].isoformat()}
+        for r in rows
+    ]
+
+
 def list_demand_signals(country: str | None = None) -> list[dict]:
     sql = ("SELECT id, country, crop, season, lat, lon, admin_area, reason, "
            "created_by, created_at FROM demand_signals")
@@ -276,6 +296,14 @@ AGENT_PAGE = """<!doctype html><html lang="en"><head>
 </style></head><body>
 <header><h1>Weather insurance quote</h1><p>Pin the farm, pick a crop, see the premium.</p></header>
 
+<div id="login">
+  <label for="u">Username<input id="u" autocomplete="username"></label>
+  <label for="p">Password<input id="p" type="password" autocomplete="current-password"></label>
+  <button class="loc-btn" id="signin" type="button">Sign in</button>
+  <div class="msg" id="lerr"></div>
+</div>
+
+<div id="app" style="display:none">
 <label for="product">Product</label>
 <select id="product"></select>
 
@@ -290,9 +318,23 @@ AGENT_PAGE = """<!doctype html><html lang="en"><head>
 
 <button id="go" type="button" disabled>Get quote</button>
 <div id="result"></div>
+</div>
 
 <script>
 var products=[], sel={lat:null,lon:null,area:null};
+
+// --- auth gate: the quote call needs an agent login ---
+function showApp(){document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='';init()}
+fetch('/auth/me').then(function(r){if(r.ok){showApp()}else{document.getElementById('login').style.display=''}});
+document.getElementById('signin').addEventListener('click',function(){
+  fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})})
+  .then(function(r){if(!r.ok)throw 0;return r.json()}).then(showApp)
+  .catch(function(){document.getElementById('lerr').textContent='Login failed — check your details.'});
+});
+
+function init(){
 function currentCountry(){var p=products[document.getElementById('product').value]; return p?p.country:null}
 function refresh(){document.getElementById('go').disabled = !(sel.lat!=null && sel.lon!=null)}
 function setCoords(lat,lon,area,label){sel={lat:lat,lon:lon,area:area||null};
@@ -353,6 +395,7 @@ function render(q){var el=document.getElementById('result');
   } else {
     el.innerHTML='<div class="card no"><div class="msg">'+q.message+'</div></div>';
   }
+}
 }
 </script>
 </body></html>"""

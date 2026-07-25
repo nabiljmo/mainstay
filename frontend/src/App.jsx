@@ -5,8 +5,20 @@ import WeatherPanel from './WeatherPanel.jsx'
 import ZoningPanel from './ZoningPanel.jsx'
 import CropLibrary from './CropLibrary.jsx'
 import ProductDesign from './ProductDesign.jsx'
+import UsersPanel from './UsersPanel.jsx'
+import OperationsPanel from './OperationsPanel.jsx'
+import Login from './Login.jsx'
 
 const API = 'http://localhost:8000'
+
+// Which tabs each role sees. admin is a superuser and sees everything.
+const TABS = [
+  { key: 'zoning', label: 'Zoning', roles: ['actuary'] },
+  { key: 'crops', label: 'Crop library', roles: ['agronomist'] },
+  { key: 'products', label: 'Products', roles: ['actuary'] },
+  { key: 'ops', label: 'Operations', roles: ['operations'] },
+  { key: 'users', label: 'Users', roles: ['admin'] },
+]
 
 const PALETTE = [
   '#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e',
@@ -31,9 +43,35 @@ export default function App() {
   const [health, setHealth] = useState({})
   const [country, setCountry] = useState('KEN')
   const [zones, setZones] = useState(null)
-  const [view, setView] = useState('zoning')
+  const [user, setUser] = useState(undefined) // undefined = still checking
+  const [view, setView] = useState(null)
 
+  const tabs = user ? TABS.filter((t) => user.role === 'admin' || t.roles.includes(user.role)) : []
+  const canZone = tabs.some((t) => t.key === 'zoning')
+
+  // Who am I? (session cookie is sent automatically by the fetch shim.)
   useEffect(() => {
+    fetch(`${API}/auth/me`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((u) => {
+        setUser(u)
+        if (u) {
+          const first = TABS.find((t) => u.role === 'admin' || t.roles.includes(u.role))
+          setView(first ? first.key : 'none')
+        }
+      })
+      .catch(() => setUser(null))
+  }, [])
+
+  const logout = () => {
+    fetch(`${API}/auth/logout`, { method: 'POST' }).finally(() => {
+      setUser(null); setView(null); setZones(null); setMapReady(false)
+    })
+  }
+
+  // Map lives only in the zoning view; init once the user (an actuary/admin) is in.
+  useEffect(() => {
+    if (!user || !canZone || !mapContainer.current || mapRef.current) return
     const map = new maplibregl.Map({
       container: mapContainer.current,
       style: 'https://tiles.openfreemap.org/styles/positron',
@@ -48,10 +86,12 @@ export default function App() {
     return () => {
       observer.disconnect()
       map.remove()
+      mapRef.current = null
     }
-  }, [])
+  }, [user, canZone])
 
   useEffect(() => {
+    if (!user) return
     const poll = () =>
       fetch(`${API}/health`)
         .then((r) => r.json())
@@ -60,7 +100,7 @@ export default function App() {
     poll()
     const t = setInterval(poll, 10000)
     return () => clearInterval(t)
-  }, [])
+  }, [user])
 
   // Draw (or clear) zone polygons whenever a zoning run is selected.
   useEffect(() => {
@@ -122,37 +162,55 @@ export default function App() {
     }
   }, [zones, mapReady])
 
+  if (user === undefined) return <div className="app-loading">Loading…</div>
+  if (user === null) return <Login onLogin={(u) => {
+    setUser(u)
+    const first = TABS.find((t) => u.role === 'admin' || t.roles.includes(u.role))
+    setView(first ? first.key : 'none')
+  }} />
+
   return (
     <div className="app">
       <header className="topbar">
         <h1>AEZ Creator &amp; Weather Index Insurance Platform</h1>
         <nav className="tabs">
-          <button className={view === 'zoning' ? 'on' : ''} onClick={() => setView('zoning')}>
-            Zoning
-          </button>
-          <button className={view === 'crops' ? 'on' : ''} onClick={() => setView('crops')}>
-            Crop library
-          </button>
-          <button className={view === 'products' ? 'on' : ''} onClick={() => setView('products')}>
-            Products
-          </button>
+          {tabs.map((t) => (
+            <button key={t.key} className={view === t.key ? 'on' : ''} onClick={() => setView(t.key)}>
+              {t.label}
+            </button>
+          ))}
         </nav>
         <div className="status">
           <StatusDot label="api" state={health.api} />
           <StatusDot label="db" state={health.db} />
           <StatusDot label="worker" state={health.worker} />
+          <span className="user-chip">
+            {user.username} <em>{user.role}</em>
+            <button className="logout" onClick={logout}>Sign out</button>
+          </span>
         </div>
       </header>
-      <div className="body" style={{ display: view === 'zoning' ? 'flex' : 'none' }}>
-        <aside className="sidebar">
-          <WeatherPanel country={country} onCountry={setCountry} />
-          <hr className="divider" />
-          <ZoningPanel country={country} onZones={setZones} />
-        </aside>
-        <div ref={mapContainer} className="map" />
-      </div>
+
+      {canZone && (
+        <div className="body" style={{ display: view === 'zoning' ? 'flex' : 'none' }}>
+          <aside className="sidebar">
+            <WeatherPanel country={country} onCountry={setCountry} />
+            <hr className="divider" />
+            <ZoningPanel country={country} onZones={setZones} />
+          </aside>
+          <div ref={mapContainer} className="map" />
+        </div>
+      )}
       {view === 'crops' && <CropLibrary />}
       {view === 'products' && <ProductDesign />}
+      {view === 'ops' && <OperationsPanel />}
+      {view === 'users' && <UsersPanel />}
+      {view === 'none' && (
+        <div className="empty-role">
+          <p>Field agents quote from the mobile app.</p>
+          <a href={`${API}/agent`} target="_blank" rel="noreferrer">Open the agent quoting page →</a>
+        </div>
+      )}
     </div>
   )
 }

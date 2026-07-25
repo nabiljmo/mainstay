@@ -17,7 +17,7 @@ app = FastAPI(title="AEZ Creator & Weather Index Insurance Platform")
 @app.on_event("startup")
 def _bootstrap_schema() -> None:
     if settings.database_url:
-        from app import crops, publish, quotes
+        from app import auth, crops, publish, quotes
         from app.db import init_schema
 
         try:
@@ -26,12 +26,15 @@ def _bootstrap_schema() -> None:
             crops.seed_if_empty()
             publish.init_schema()
             quotes.init_schema()
+            auth.init_schema()
+            auth.seed_admin()
         except Exception:
             pass  # /health surfaces db state; don't block startup on a race
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
+    allow_credentials=True,  # session cookie rides cross-origin (same-site localhost)
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -75,12 +78,113 @@ def health() -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Auth (issue 013): login with per-user accounts; role checks live in app.auth.
+# ---------------------------------------------------------------------------
+
+from fastapi import Cookie, Depends, Response  # noqa: E402
+
+from app.auth import COOKIE_NAME, SESSION_HOURS, current_user, require  # noqa: E402
+
+# Reusable role gates (admin passes all of them). INTERNAL = staff workbench
+# (everyone except field agents); AUTHED = any logged-in user.
+AUTHED = require()
+INTERNAL = require("actuary", "agronomist", "operations")
+ACTUARY = require("actuary")
+AGRONOMIST = require("agronomist")
+OPERATIONS = require("operations")
+AGENT = require("agent")
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/auth/login")
+def auth_login(req: LoginRequest, response: Response) -> dict:
+    from app.auth import login, user_for_token
+
+    token = login(req.username, req.password)
+    if not token:
+        raise HTTPException(401, "Invalid username or password")
+    response.set_cookie(
+        key=COOKIE_NAME, value=token, httponly=True, samesite="lax",
+        max_age=SESSION_HOURS * 3600, path="/",
+    )
+    return user_for_token(token)
+
+
+@app.post("/auth/logout")
+def auth_logout(response: Response, aez_session: str | None = Cookie(default=None)) -> dict:
+    from app.auth import logout
+
+    logout(aez_session)
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return {"ok": True}
+
+
+@app.get("/auth/me")
+def auth_me(user: dict = Depends(current_user)) -> dict:
+    return user
+
+
+# ----- admin: user management (admin only) -----
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+    role: str
+
+
+class UpdateUserRequest(BaseModel):
+    active: bool | None = None
+    role: str | None = None
+    password: str | None = None
+
+
+@app.get("/admin/users")
+def admin_list_users(_: dict = Depends(require("admin"))) -> list[dict]:
+    from app.auth import list_users
+
+    return list_users()
+
+
+@app.post("/admin/users")
+def admin_create_user(req: CreateUserRequest, user: dict = Depends(require("admin"))) -> dict:
+    from app.auth import create_user
+
+    try:
+        return create_user(req.username, req.password, req.role, created_by=user["username"])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.patch("/admin/users/{username}")
+def admin_update_user(username: str, req: UpdateUserRequest,
+                      _: dict = Depends(require("admin"))) -> dict:
+    from app.auth import list_users, set_active, set_password, set_role
+
+    if not any(u["username"] == username for u in list_users()):
+        raise HTTPException(404, f"No user {username}")
+    try:
+        if req.role is not None:
+            set_role(username, req.role)
+        if req.active is not None:
+            set_active(username, req.active)
+        if req.password:
+            set_password(username, req.password)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return next(u for u in list_users() if u["username"] == username)
+
+
 def _store() -> WeatherStore:
     return WeatherStore(cache_dir=Path(settings.weather_cache_dir))
 
 
 @app.get("/weather/countries")
-def weather_countries() -> list[dict]:
+def weather_countries(_: dict = Depends(INTERNAL)) -> list[dict]:
     store = _store()
     return [
         {"code": code, "name": info["name"], "cached_years": store.cached_years(code)}
@@ -95,7 +199,7 @@ class FetchRequest(BaseModel):
 
 
 @app.post("/weather/fetch")
-def start_weather_fetch(req: FetchRequest) -> dict:
+def start_weather_fetch(req: FetchRequest, _: dict = Depends(ACTUARY)) -> dict:
     if req.country not in COUNTRIES:
         raise HTTPException(404, f"Unknown country code: {req.country}")
     current = date.today().year
@@ -106,7 +210,8 @@ def start_weather_fetch(req: FetchRequest) -> dict:
 
 
 @app.get("/weather/series")
-def weather_series(country: str, lon: float, lat: float, start: date, end: date) -> dict:
+def weather_series(country: str, lon: float, lat: float, start: date, end: date,
+                   _: dict = Depends(INTERNAL)) -> dict:
     try:
         series = _store().series(country, lon, lat, start, end)
     except FileNotFoundError as exc:
@@ -127,7 +232,7 @@ class ZoningRequest(BaseModel):
 
 
 @app.post("/zoning/run")
-def start_zoning_run(req: ZoningRequest) -> dict:
+def start_zoning_run(req: ZoningRequest, _: dict = Depends(ACTUARY)) -> dict:
     if req.country not in COUNTRIES:
         raise HTTPException(404, f"Unknown country code: {req.country}")
     if not (2 <= req.n_clusters <= 50):
@@ -148,7 +253,7 @@ def _zoning_dir(country: str) -> Path:
 
 
 @app.get("/zoning/runs")
-def list_zoning_runs(country: str) -> list[dict]:
+def list_zoning_runs(country: str, _: dict = Depends(INTERNAL)) -> list[dict]:
     import json
 
     d = _zoning_dir(country)
@@ -170,7 +275,7 @@ def list_zoning_runs(country: str) -> list[dict]:
 
 
 @app.get("/zoning/runs/{country}/{run_id}/geojson")
-def zoning_run_geojson(country: str, run_id: str) -> dict:
+def zoning_run_geojson(country: str, run_id: str, _: dict = Depends(INTERNAL)) -> dict:
     import json
 
     p = _zoning_dir(country) / f"{run_id}.json"
@@ -181,11 +286,11 @@ def zoning_run_geojson(country: str, run_id: str) -> dict:
 
 class ApproveRequest(BaseModel):
     name: str
-    approved_by: str
 
 
 @app.post("/zoning/runs/{country}/{run_id}/approve")
-def approve_zone_map(country: str, run_id: str, req: ApproveRequest) -> dict:
+def approve_zone_map(country: str, run_id: str, req: ApproveRequest,
+                     user: dict = Depends(ACTUARY)) -> dict:
     """Freeze a draft zoning run as an immutable, named zone map version."""
     import json
 
@@ -209,7 +314,7 @@ def approve_zone_map(country: str, run_id: str, req: ApproveRequest) -> dict:
                     json.dumps(rec["params"]),
                     json.dumps(rec["homogeneity"]),
                     json.dumps(rec["geojson"]),
-                    req.approved_by,
+                    user["username"],
                 ),
             )
     except Exception as exc:
@@ -220,7 +325,7 @@ def approve_zone_map(country: str, run_id: str, req: ApproveRequest) -> dict:
 
 
 @app.get("/zone-maps")
-def list_zone_maps(country: str | None = None) -> list[dict]:
+def list_zone_maps(country: str | None = None, _: dict = Depends(INTERNAL)) -> list[dict]:
     from app.db import connect
 
     q = """SELECT name, country, run_id, params, homogeneity, approved_by, approved_at
@@ -242,7 +347,7 @@ def list_zone_maps(country: str | None = None) -> list[dict]:
 
 
 @app.get("/zone-maps/{name}/geojson")
-def zone_map_geojson(name: str) -> dict:
+def zone_map_geojson(name: str, _: dict = Depends(INTERNAL)) -> dict:
     from app.db import connect
 
     with connect() as conn:
@@ -255,21 +360,21 @@ def zone_map_geojson(name: str) -> dict:
 
 
 @app.get("/crops")
-def list_crops() -> list[dict]:
+def list_crops(_: dict = Depends(INTERNAL)) -> list[dict]:
     from app import crops
 
     return crops.latest_versions()
 
 
 @app.get("/crops/{crop}/versions")
-def crop_versions(crop: str) -> list[dict]:
+def crop_versions(crop: str, _: dict = Depends(INTERNAL)) -> list[dict]:
     from app import crops
 
     return crops.versions_of(crop)
 
 
 @app.get("/crops/{crop}/versions/{version}")
-def crop_version(crop: str, version: int) -> dict:
+def crop_version(crop: str, version: int, _: dict = Depends(INTERNAL)) -> dict:
     from app import crops
 
     rec = crops.get_version(crop, version)
@@ -281,18 +386,18 @@ def crop_version(crop: str, version: int) -> dict:
 class CropSaveRequest(BaseModel):
     stages: list[dict]
     seasons: list[dict]
-    edited_by: str
     source: str = ""
     reviewed: bool = False
 
 
 @app.post("/crops/{crop}/versions")
-def save_crop_version(crop: str, req: CropSaveRequest) -> dict:
+def save_crop_version(crop: str, req: CropSaveRequest,
+                      user: dict = Depends(AGRONOMIST)) -> dict:
     from app import crops
 
     warnings = crops.validate(req.stages, req.seasons)
     rec = crops.save_new_version(
-        crop, req.stages, req.seasons, req.edited_by, req.source, req.reviewed
+        crop, req.stages, req.seasons, user["username"], req.source, req.reviewed
     )
     return {**rec, "warnings": warnings}
 
@@ -306,11 +411,10 @@ class ProductDraftRequest(BaseModel):
     start_year: int
     end_year: int
     sum_insured: float = 10000.0
-    created_by: str = "admin"
 
 
 @app.post("/products/draft")
-def start_product_draft(req: ProductDraftRequest) -> dict:
+def start_product_draft(req: ProductDraftRequest, user: dict = Depends(ACTUARY)) -> dict:
     years = list(range(req.start_year, req.end_year + 1))
     cached = set(_store().cached_years(req.country))
     missing = [y for y in years if y not in cached]
@@ -318,13 +422,13 @@ def start_product_draft(req: ProductDraftRequest) -> dict:
         raise HTTPException(409, f"Years not cached: {missing} — fetch weather data first")
     task = draft_product.delay(
         req.country, req.zone_map, req.crop, req.crop_version, req.season,
-        years, req.sum_insured, req.created_by,
+        years, req.sum_insured, user["username"],
     )
     return {"job_id": task.id}
 
 
 @app.get("/products/drafts")
-def list_product_drafts() -> list[dict]:
+def list_product_drafts(_: dict = Depends(ACTUARY)) -> list[dict]:
     from app.db import connect
 
     with connect() as conn:
@@ -344,7 +448,7 @@ def list_product_drafts() -> list[dict]:
 
 
 @app.get("/products/drafts/{draft_id}")
-def get_product_draft(draft_id: str) -> dict:
+def get_product_draft(draft_id: str, _: dict = Depends(ACTUARY)) -> dict:
     from app.db import connect
 
     with connect() as conn:
@@ -361,7 +465,8 @@ class PriceZoneRequest(BaseModel):
 
 
 @app.post("/products/drafts/{draft_id}/zones/{zone}/price")
-def price_zone(draft_id: str, zone: int, req: PriceZoneRequest) -> dict:
+def price_zone(draft_id: str, zone: int, req: PriceZoneRequest,
+               _: dict = Depends(ACTUARY)) -> dict:
     """Recompute the per-year index/payout table for one zone with the given
     (possibly edited) phase terms — the actuary's live feedback loop."""
     from app.db import connect
@@ -435,7 +540,8 @@ class PriceEconomicsRequest(BaseModel):
 
 
 @app.post("/products/drafts/{draft_id}/zones/{zone}/economics")
-def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest) -> dict:
+def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest,
+                   _: dict = Depends(ACTUARY)) -> dict:
     """Full pricing for one zone: expected loss + loadings -> commercial rate."""
     from app.db import connect
     from app.economics import compute_zone_economics
@@ -468,7 +574,7 @@ def zone_economics(draft_id: str, zone: int, req: PriceEconomicsRequest) -> dict
 
 
 @app.get("/pricing/defaults")
-def pricing_defaults() -> dict:
+def pricing_defaults(_: dict = Depends(ACTUARY)) -> dict:
     from app.pricing import DEFAULT_LOADINGS, DISTRIBUTIONS
 
     return {"loadings": DEFAULT_LOADINGS, "distributions": list(DISTRIBUTIONS)}
@@ -483,31 +589,31 @@ class PublishRequest(BaseModel):
     distribution: str = "gamma"
     loadings: list[dict]
     zone_phases: dict | None = None  # {zone_id: phases} — the actuary's edits
-    published_by: str = "admin"
 
 
 @app.post("/products/drafts/{draft_id}/publish")
-def publish_draft(draft_id: str, req: PublishRequest) -> dict:
+def publish_draft(draft_id: str, req: PublishRequest, user: dict = Depends(ACTUARY)) -> dict:
     from app.publish import PublishError, publish_product
 
     try:
         return publish_product(
             _store(), draft_id, req.distribution, req.loadings,
-            req.zone_phases, req.published_by,
+            req.zone_phases, user["username"],
         )
     except PublishError as e:
         raise HTTPException(400, str(e))
 
 
 @app.get("/products/published")
-def list_published_products() -> list[dict]:
+def list_published_products(_: dict = Depends(AUTHED)) -> list[dict]:
+    # Any signed-in user, incl. agents (the agent page lists what's quotable).
     from app.publish import list_published
 
     return list_published()
 
 
 @app.get("/products/published/{product_id}")
-def get_published_product(product_id: str) -> dict:
+def get_published_product(product_id: str, _: dict = Depends(INTERNAL)) -> dict:
     from app.publish import get_published
 
     product = get_published(product_id)
@@ -517,7 +623,7 @@ def get_published_product(product_id: str) -> dict:
 
 
 @app.get("/products/published/{product_id}/assumption-sheet")
-def published_assumption_sheet(product_id: str):
+def published_assumption_sheet(product_id: str, _: dict = Depends(INTERNAL)):
     from fastapi.responses import HTMLResponse
 
     from app.publish import get_published, render_assumption_sheet_html
@@ -529,7 +635,8 @@ def published_assumption_sheet(product_id: str):
 
 
 @app.get("/rates")
-def query_rates(country: str, crop: str, season: str, zone: int | None = None) -> list[dict]:
+def query_rates(country: str, crop: str, season: str, zone: int | None = None,
+                _: dict = Depends(INTERNAL)) -> list[dict]:
     """The quoting source: latest published rates by (country, crop, season[, zone])."""
     from app.publish import get_rates
 
@@ -550,31 +657,42 @@ class QuoteRequest(BaseModel):
     lat: float
     lon: float
     admin_area: str | None = None
-    created_by: str = "agent"
 
 
 @app.post("/quotes")
-def create_quote_endpoint(req: QuoteRequest) -> dict:
+def create_quote_endpoint(req: QuoteRequest, user: dict = Depends(AGENT)) -> dict:
     from app.quotes import create_quote
 
     return create_quote(
         req.country, req.crop, req.season, req.sum_insured,
-        req.lat, req.lon, req.admin_area, req.created_by,
+        req.lat, req.lon, req.admin_area, user["username"],
     )
 
 
+@app.get("/quotes")
+def list_quotes_endpoint(user: dict = Depends(AUTHED)) -> list[dict]:
+    """An agent sees only their own quotes; operations/admin see all."""
+    from app.quotes import list_quotes
+
+    scope = None if user["role"] in ("operations", "admin") else user["username"]
+    return list_quotes(scope)
+
+
 @app.get("/quotes/{reference}")
-def get_quote_endpoint(reference: str) -> dict:
+def get_quote_endpoint(reference: str, user: dict = Depends(AUTHED)) -> dict:
     from app.quotes import get_quote
 
     q = get_quote(reference)
     if not q:
         raise HTTPException(404, f"No quote {reference}")
+    # Agent scoping: you can read your own quote; operations/admin read any.
+    if user["role"] not in ("operations", "admin") and q["created_by"] != user["username"]:
+        raise HTTPException(403, "Not your quote")
     return q
 
 
 @app.get("/quote-areas")
-def quote_areas_endpoint(country: str) -> list[dict]:
+def quote_areas_endpoint(country: str, _: dict = Depends(AUTHED)) -> list[dict]:
     """Admin districts + centroids for the village-picker fallback."""
     from app.quotes import quote_areas
 
@@ -582,7 +700,8 @@ def quote_areas_endpoint(country: str) -> list[dict]:
 
 
 @app.get("/demand-signals")
-def demand_signals_endpoint(country: str | None = None) -> list[dict]:
+def demand_signals_endpoint(country: str | None = None,
+                            _: dict = Depends(OPERATIONS)) -> list[dict]:
     from app.quotes import list_demand_signals
 
     return list_demand_signals(country)
@@ -590,7 +709,8 @@ def demand_signals_endpoint(country: str | None = None) -> list[dict]:
 
 @app.get("/agent")
 def agent_page():
-    """Lightweight, phone-friendly quoting page for field agents."""
+    """Lightweight, phone-friendly quoting page for field agents. The page shell
+    is public; every action on it requires an agent login."""
     from fastapi.responses import HTMLResponse
 
     from app.quotes import AGENT_PAGE
@@ -599,13 +719,13 @@ def agent_page():
 
 
 @app.post("/jobs/demo")
-def start_demo_job() -> dict:
+def start_demo_job(_: dict = Depends(AUTHED)) -> dict:
     task = demo_job.delay()
     return {"job_id": task.id}
 
 
 @app.get("/jobs/{job_id}")
-def job_status(job_id: str) -> dict:
+def job_status(job_id: str, _: dict = Depends(AUTHED)) -> dict:
     result = AsyncResult(job_id, app=celery_app)
     payload: dict = {"job_id": job_id, "state": result.state}
     if result.state == "PROGRESS":

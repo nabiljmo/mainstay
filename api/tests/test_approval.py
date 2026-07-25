@@ -16,14 +16,17 @@ DB_URL = "postgresql://aez:aez@localhost:5432/aez"
 def db_or_skip(monkeypatch):
     monkeypatch.setattr(settings, "database_url", DB_URL)
     try:
+        from app import auth
         from app.db import connect, init_schema
 
         init_schema()
+        auth.init_schema()
     except Exception:
         pytest.skip("PostgreSQL not reachable — run `docker compose up db`")
     yield
     with connect() as conn:
         conn.execute("DELETE FROM zone_map_versions WHERE name LIKE 'pytest-%'")
+        conn.execute("DELETE FROM users WHERE created_by = 'test'")
 
 
 @pytest.fixture
@@ -42,47 +45,49 @@ def draft_run(monkeypatch, tmp_path):
     return "test-run"
 
 
-def test_approve_freezes_and_records_audit(db_or_skip, draft_run):
+def test_approve_freezes_and_records_audit(db_or_skip, draft_run, login):
     from fastapi.testclient import TestClient
 
     from app.main import app
 
     client = TestClient(app)
+    actor = login(client, "actuary")
     name = f"pytest-{uuid.uuid4().hex[:8]}"
 
     r = client.post(
         f"/zoning/runs/KEN/{draft_run}/approve",
-        json={"name": name, "approved_by": "pytest"},
+        json={"name": name},
     )
     assert r.status_code == 200
 
     versions = client.get("/zone-maps", params={"country": "KEN"}).json()
     mine = next(v for v in versions if v["name"] == name)
-    # Audit record completeness: who, when, and every parameter.
-    assert mine["approved_by"] == "pytest"
+    # Audit record completeness: who (the acting user), when, every parameter.
+    assert mine["approved_by"] == actor
     assert mine["approved_at"]
     assert mine["params"]["years"] == [2021]
     assert mine["params"]["n_clusters"] == 3
     assert mine["params"]["seed"] == 1
 
 
-def test_approved_versions_are_immutable(db_or_skip, draft_run):
+def test_approved_versions_are_immutable(db_or_skip, draft_run, login):
     from fastapi.testclient import TestClient
 
     from app.main import app
 
     client = TestClient(app)
+    login(client, "actuary")
     name = f"pytest-{uuid.uuid4().hex[:8]}"
 
     first = client.post(
         f"/zoning/runs/KEN/{draft_run}/approve",
-        json={"name": name, "approved_by": "pytest"},
+        json={"name": name},
     )
     assert first.status_code == 200
 
     again = client.post(
         f"/zoning/runs/KEN/{draft_run}/approve",
-        json={"name": name, "approved_by": "someone-else"},
+        json={"name": name},
     )
     assert again.status_code == 409
     assert "immutable" in again.json()["detail"]
