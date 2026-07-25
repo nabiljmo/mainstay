@@ -1,6 +1,7 @@
 import time
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.config import settings
 
@@ -10,6 +11,16 @@ celery_app = Celery(
     backend=settings.redis_url or "redis://localhost:6379/0",
 )
 celery_app.conf.task_track_started = True
+
+# The platform's first scheduled job (SPEC §9): each day, check for newly
+# published CHIRPS final data and settle any phase that has just gone final.
+# Runs under `celery beat`; nothing else in the system needs a manual trigger.
+celery_app.conf.beat_schedule = {
+    "settle-due-daily": {
+        "task": "app.worker.settle_due",
+        "schedule": crontab(hour=3, minute=0),
+    },
+}
 
 
 @celery_app.task(bind=True)
@@ -167,6 +178,16 @@ def draft_product(
             ),
         )
     return {"draft_id": draft_id, "zones": len(definition["zones"])}
+
+
+@celery_app.task(bind=True)
+def settle_due(self, product_id: str | None = None, season_year: int | None = None) -> dict:
+    """Scheduled settlement sweep: refresh the live season's CHIRPS, compute each
+    product's newly-final phases, and persist them. Provisional never persists."""
+    from app.settlement import run_settlement_sweep
+
+    self.update_state(state="PROGRESS", meta={"stage": "settling due phases"})
+    return run_settlement_sweep(product_id=product_id, season_year=season_year)
 
 
 @celery_app.task(bind=True)

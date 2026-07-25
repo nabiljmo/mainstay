@@ -146,6 +146,29 @@ class WeatherStore:
         self._meta_path(country, year).write_text(json.dumps(meta, indent=2))
         return meta
 
+    def refresh_year(
+        self,
+        country: str,
+        year: int,
+        bbox: tuple,
+        progress: Callable[[int, int], None] | None = None,
+    ) -> dict:
+        """Re-fetch a not-yet-complete year to pick up newly published days.
+
+        Unlike ``ensure_year`` (a permanent no-op once cached), this is the
+        settlement data-availability check: a live season's cache is stale the
+        moment CHIRPS publishes another day. A year already cached to completion
+        (every day of an elapsed year) never changes, so it is left untouched;
+        an incomplete year is dropped and re-fetched up to yesterday."""
+        path = self._year_path(country, year)
+        if path.exists():
+            meta = self.meta(country, year)
+            if meta.get("days", 0) >= len(days_in_year(year)):
+                return meta  # fully elapsed and cached — final, nothing new
+            path.unlink()
+            self._meta_path(country, year).unlink(missing_ok=True)
+        return self.ensure_year(country, year, bbox, progress=progress)
+
     def pixel_index(self, grid: Grid, lon: float, lat: float) -> tuple[int, int]:
         col = round((lon - grid["x0"]) / grid["dx"])
         row = round((lat - grid["y0"]) / grid["dy"])

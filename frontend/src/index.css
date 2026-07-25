@@ -471,3 +471,5 @@ button.del:hover { background: var(--danger-soft); box-shadow: none; transform: 
 .pstatus.active { background: var(--positive-soft); color: #15803d; }
 .pstatus.expired { background: var(--warn-soft); color: #92400e; }
 .pstatus.settled { background: var(--accent-soft); color: var(--accent-deep); }
+.pstatus.provisional { background: var(--warn-soft); color: #92400e; }
+.pstatus.upcoming { background: var(--surface-3); color: var(--text-muted); }

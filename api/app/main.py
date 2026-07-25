@@ -17,7 +17,7 @@ app = FastAPI(title="Mainstay — Weather Index Insurance Platform")
 @app.on_event("startup")
 def _bootstrap_schema() -> None:
     if settings.database_url:
-        from app import auth, crops, policies, publish, quotes
+        from app import auth, crops, policies, publish, quotes, settlement
         from app.db import init_schema
 
         try:
@@ -27,6 +27,7 @@ def _bootstrap_schema() -> None:
             publish.init_schema()
             quotes.init_schema()
             policies.init_schema()
+            settlement.init_schema()
             auth.init_schema()
             auth.seed_admin()
         except Exception:
@@ -815,6 +816,40 @@ def policy_status_endpoint(policy_id: str, req: StatusRequest,
         return set_status(policy_id, req.status)
     except BindError as e:
         raise HTTPException(400, str(e))
+
+
+# ---------------------------------------------------------------------------
+# Settlement / season dashboard (issue 016): the season watched live through the
+# same engine that priced the product. Provisional (from the in-season window)
+# is clearly distinguished from settled (CHIRPS final, past the ~3-week lag);
+# only settled values are ever persisted.
+# ---------------------------------------------------------------------------
+
+@app.get("/settlement/season")
+def settlement_season(product_id: str, season_year: int | None = None,
+                      _: dict = Depends(OPERATIONS)) -> dict:
+    from app.settlement import season_view
+
+    try:
+        return season_view(_store(), product_id, season_year=season_year)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+class SettlementRunRequest(BaseModel):
+    product_id: str | None = None
+    season_year: int | None = None
+
+
+@app.post("/settlement/run")
+def settlement_run(req: SettlementRunRequest, _: dict = Depends(OPERATIONS)) -> dict:
+    """On-demand settlement sweep (the scheduled job runs the same code daily).
+    Computes and persists any phase that has newly gone final."""
+    from app.settlement import run_settlement_sweep
+
+    return run_settlement_sweep(
+        _store(), product_id=req.product_id, season_year=req.season_year
+    )
 
 
 @app.post("/jobs/demo")

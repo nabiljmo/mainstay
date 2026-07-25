@@ -8,6 +8,7 @@ import ProductDesign from './ProductDesign.jsx'
 import UsersPanel from './UsersPanel.jsx'
 import OperationsPanel from './OperationsPanel.jsx'
 import PoliciesPanel from './PoliciesPanel.jsx'
+import SeasonDashboard from './SeasonDashboard.jsx'
 import Login from './Login.jsx'
 
 const API = 'http://localhost:8000'
@@ -18,6 +19,7 @@ const TABS = [
   { key: 'crops', label: 'Crop library', roles: ['agronomist'] },
   { key: 'products', label: 'Products', roles: ['actuary'] },
   { key: 'policies', label: 'Policies', roles: ['operations'] },
+  { key: 'season', label: 'Season', roles: ['operations'] },
   { key: 'ops', label: 'Operations', roles: ['operations'] },
   { key: 'users', label: 'Users', roles: ['admin'] },
 ]
@@ -206,6 +208,7 @@ export default function App() {
       {view === 'crops' && <CropLibrary />}
       {view === 'products' && <ProductDesign />}
       {view === 'policies' && <PoliciesPanel />}
+      {view === 'season' && <SeasonDashboard />}
       {view === 'ops' && <OperationsPanel />}
       {view === 'users' && <UsersPanel />}
       {view === 'none' && (
