@@ -1,6 +1,6 @@
 # Runbook — 012 · Kenya maize long-rains: publish + blind rate validation
 
-**Owner:** The actuary (HITL) · **Blocked by:** 007 (Kenya zone map), 011 (publish) — both done.
+**Owner:** Acting actuary (HITL) · **Blocked by:** 007 (Kenya zone map), 011 (publish) — both done.
 **Goal:** publish the pilot product, then prove the engine by comparing its rates
 against the company's withheld internal rates and attributing every gap to a cause.
 

@@ -10,7 +10,7 @@ phase: 1
 
 ## What to build
 
-Nothing new — this is the Phase 1 milestone, done by a human. The actuary (acting actuary) runs zoning for Kenya on full-depth CHIRPS, iterates on cluster count and sensitivity while watching homogeneity scores, decides on admin-snap, and approves KEN-v1. Output is the first production artefact of the platform.
+Nothing new — this is the Phase 1 milestone, done by a human. The acting actuary runs zoning for Kenya on full-depth CHIRPS, iterates on cluster count and sensitivity while watching homogeneity scores, decides on admin-snap, and approves KEN-v1. Output is the first production artefact of the platform.
 
 ## Acceptance criteria
 
