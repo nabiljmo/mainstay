@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const API = 'http://localhost:8000'
+import { API } from './config.js'
 
 // A phase's settlement status → badge label + class (extends .pstatus in css).
 const STATUS_LABEL = { upcoming: 'upcoming', provisional: 'provisional', settled: 'settled' }

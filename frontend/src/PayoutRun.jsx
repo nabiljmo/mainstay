@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const API = 'http://localhost:8000'
+import { API } from './config.js'
 const money = (n) => (n == null ? '—' : Math.round(n).toLocaleString())
 
 export default function PayoutRun() {

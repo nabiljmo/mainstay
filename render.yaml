@@ -1,0 +1,73 @@
+# Render Blueprint — deploys the whole platform and redeploys on every git push.
+#
+# In Render: New → Blueprint → connect this repo. Render reads this file and
+# creates the database, Redis, the backend, and the frontend. Two values must be
+# filled in by hand AFTER the first deploy, once the URLs exist (marked
+# `sync: false` below) — see README "Deploying online".
+#
+# Plan names (starter / basic-256mb / free) are the small tiers; adjust in the
+# Render UI to taste. Nothing here needs PostGIS — the app does its spatial work
+# in Python, so a plain managed Postgres is enough.
+
+databases:
+  - name: aez-db
+    databaseName: aez
+    user: aez
+    plan: basic-256mb
+
+services:
+  # Redis — Celery's broker and result backend. Internal only.
+  - type: redis
+    name: aez-redis
+    plan: free
+    ipAllowList: []
+
+  # Backend: API + Celery worker + beat in one service (see api/start-prod.sh),
+  # sharing the weather-cache disk.
+  - type: web
+    name: aez-api
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    dockerCommand: ./start-prod.sh
+    plan: starter
+    healthCheckPath: /health
+    disk:
+      name: weather-cache
+      mountPath: /weather-cache
+      sizeGB: 10
+    envVars:
+      - key: AEZ_DATABASE_URL
+        fromDatabase:
+          name: aez-db
+          property: connectionString
+      - key: AEZ_REDIS_URL
+        fromService:
+          name: aez-redis
+          type: redis
+          property: connectionString
+      - key: AEZ_WEATHER_CACHE_DIR
+        value: /weather-cache
+      - key: AEZ_PII_KEY
+        generateValue: true          # Render mints a strong secret and keeps it
+      - key: AEZ_COOKIE_SECURE
+        value: "true"
+      - key: AEZ_COOKIE_SAMESITE
+        value: none                  # frontend is a different origin
+      - key: AEZ_ALLOWED_ORIGINS
+        sync: false                  # set to the frontend URL after first deploy
+
+  # Frontend: built to static files and served on the CDN.
+  - type: web
+    name: aez-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false                  # set to the API URL after first deploy
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

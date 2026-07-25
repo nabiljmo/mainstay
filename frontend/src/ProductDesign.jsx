@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const API = 'http://localhost:8000'
+import { API } from './config.js'
 
 function QQPlot({ qq }) {
   const W = 260, H = 160, pad = 30

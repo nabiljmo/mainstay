@@ -36,8 +36,8 @@ def _bootstrap_schema() -> None:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,  # session cookie rides cross-origin (same-site localhost)
+    allow_origins=settings.origins,  # exact origins (credentials forbid wildcard)
+    allow_credentials=True,  # session cookie rides cross-origin
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -112,7 +112,8 @@ def auth_login(req: LoginRequest, response: Response) -> dict:
     if not token:
         raise HTTPException(401, "Invalid username or password")
     response.set_cookie(
-        key=COOKIE_NAME, value=token, httponly=True, samesite="lax",
+        key=COOKIE_NAME, value=token, httponly=True,
+        samesite=settings.cookie_samesite, secure=settings.cookie_secure,
         max_age=SESSION_HOURS * 3600, path="/",
     )
     return user_for_token(token)

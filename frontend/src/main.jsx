@@ -6,7 +6,7 @@ import './index.css'
 // The API lives on a different port, so cross-origin fetches don't send our
 // session cookie unless credentials are included. Rather than thread this
 // through every call site, add it once for requests aimed at the API origin.
-const API_ORIGIN = 'http://localhost:8000'
+import { API as API_ORIGIN } from './config.js'
 const _fetch = window.fetch.bind(window)
 window.fetch = (input, init = {}) => {
   const url = typeof input === 'string' ? input : input?.url

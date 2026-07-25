@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const API = 'http://localhost:8000'
+import { API } from './config.js'
 const ROLES = ['admin', 'actuary', 'agronomist', 'agent', 'operations']
 
 export default function UsersPanel() {

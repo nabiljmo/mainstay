@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const API = 'http://localhost:8000'
+import { API } from './config.js'
 const STATUS = ['', 'draft', 'active', 'expired', 'settled']
 
 export default function PoliciesPanel() {

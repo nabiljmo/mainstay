@@ -12,7 +12,7 @@ import SeasonDashboard from './SeasonDashboard.jsx'
 import PayoutRun from './PayoutRun.jsx'
 import Login from './Login.jsx'
 
-const API = 'http://localhost:8000'
+import { API } from './config.js'
 
 // Which tabs each role sees. admin is a superuser and sees everything.
 const TABS = [
