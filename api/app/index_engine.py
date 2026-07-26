@@ -153,19 +153,24 @@ def phase_payout(index: float, phase: Phase) -> float:
 
 def propose_triggers(history: list[float], cover_type: str) -> tuple[float, float]:
     """Starting strike/exit from the historical index distribution.
+
     Deficit protects the dry tail (low percentiles); excess/dry_spell protect
-    the high tail. These are proposals — the actuary always overrides."""
+    the high tail. The strike is set so the cover fires in roughly 1-2 years in
+    10 (deficit strike at the 15th percentile, excess/dry at the 85th), not 3 in
+    10 — a payout that rare keeps the premium affordable. Full payout is reached
+    only in a genuinely extreme year (5th / 95th). These are proposals — the
+    actuary always overrides."""
     arr = np.asarray(history, dtype=float)
     arr = arr[~np.isnan(arr)]
     if len(arr) == 0:
         return (0.0, 0.0)
     if cover_type == DEFICIT:
-        strike = float(np.percentile(arr, 30))
+        strike = float(np.percentile(arr, 15))
         exit_ = float(np.percentile(arr, 5))
         if strike <= exit_:               # near-degenerate history
             strike = exit_ + 1.0
     else:
-        strike = float(np.percentile(arr, 70))
+        strike = float(np.percentile(arr, 85))
         exit_ = float(np.percentile(arr, 95))
         if exit_ <= strike:
             exit_ = strike + 1.0

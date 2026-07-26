@@ -237,12 +237,17 @@ def persisted_settlements(product_id: str, season_year: int) -> dict:
 def season_year_for(product_id: str, today: date | None = None) -> int:
     """The live season's calendar year for a product.
 
-    Policies are bound before the season's planting, within the same calendar
-    year as the planting for the pilot's single-year seasons (Kenya long/short
-    rains). So the year of the latest bound policy is the season year. Falls back
-    to today's year when nothing is bound yet. Swappable when seasons that span a
-    year boundary arrive."""
+    Prefers the season each policy was stamped with at bind time (the covered
+    season, set by the sales cut-off). Falls back to the binding year for older
+    policies with no stamp, then to today's year when nothing is bound yet."""
     with connect() as conn:
+        row = conn.execute(
+            "SELECT MAX(season_year) FROM master_policies "
+            "WHERE product_id = %s AND season_year IS NOT NULL",
+            (product_id,),
+        ).fetchone()
+        if row and row[0]:
+            return int(row[0])
         row = conn.execute(
             "SELECT MAX(created_at) FROM master_policies WHERE product_id = %s",
             (product_id,),

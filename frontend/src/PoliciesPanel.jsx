@@ -68,7 +68,7 @@ export default function PoliciesPanel() {
         {policies.map((m) => (
           <div key={m.id} className={`run ${openId === m.id ? 'selected' : ''}`} onClick={() => open(m.id)}>
             <strong>{m.partner_name || 'Individual sale'}</strong> <Badge s={m.status} /><br />
-            {m.crop} · {m.season.replace('_', ' ')} · {m.farmers} farmer{m.farmers === 1 ? '' : 's'} · prem {m.total_premium.toLocaleString()}
+            {m.crop} · {m.season.replace('_', ' ')}{m.season_year ? ` ${m.season_year}` : ''} · {m.farmers} farmer{m.farmers === 1 ? '' : 's'} · prem {m.total_premium.toLocaleString()}
           </div>
         ))}
       </div>
@@ -80,7 +80,7 @@ export default function PoliciesPanel() {
           <>
             <h2>{detail.partner_name || 'Individual sale'} <Badge s={detail.status} /></h2>
             <p className="hint-note">
-              {detail.id} · {detail.crop} · {detail.season.replace('_', ' ')} · sold by {detail.created_by}
+              {detail.id} · {detail.crop} · {detail.season.replace('_', ' ')}{detail.season_year ? ` ${detail.season_year}` : ''} · sold by {detail.created_by}
               {detail.receipt_ref ? ` · receipt ${detail.receipt_ref} (${detail.receipt_date})` : ' · no receipt yet'}
             </p>
 

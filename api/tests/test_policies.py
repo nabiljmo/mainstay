@@ -131,6 +131,47 @@ def test_individual_bind_creates_master_and_one_schedule_row(env):
     assert detail["schedule"][0]["farmer"]["name"] == "Amina Otieno"  # decrypted back
 
 
+# ----- sales cut-off (anti-selection) -----
+
+def test_covered_season_before_cutoff_is_this_year():
+    from datetime import date
+
+    from app.policies import covered_season
+
+    # Planting 03-15, 14-day buffer → cutoff 03-01. A February bind is in time.
+    year, cutoff = covered_season("03-15", date(2026, 2, 1))
+    assert year == 2026 and cutoff == date(2026, 3, 1)
+
+
+def test_covered_season_after_cutoff_rolls_to_next_year():
+    from datetime import date
+
+    from app.policies import covered_season
+
+    # A mid-season bind (June) is past this year's cutoff → covers next season.
+    year, cutoff = covered_season("03-15", date(2026, 6, 20))
+    assert year == 2027 and cutoff == date(2027, 3, 1)
+
+
+def test_bind_stamps_the_covered_season(env):
+    from datetime import date
+
+    from app.policies import covered_season
+
+    make_agent, pub, admin = env
+    a = make_agent()
+    q = _quote(a)
+    r = a.post("/policies", json={"sale_type": "individual",
+               "entries": [{"quote_reference": q["reference"], "farmer": FARMER}]})
+    assert r.status_code == 200, r.text
+    p = r.json()
+    expected_year, _ = covered_season("03-15", date.today())  # product plants 03-15
+    assert p["season_year"] == expected_year
+    assert p["sales_cutoff"] is not None
+    # The register carries it too.
+    assert admin.get(f"/policies/{p['id']}").json()["season_year"] == expected_year
+
+
 def test_partner_bind_bundles_many_farmers_under_one_master(env):
     make_agent, pub, admin = env
     a = make_agent()

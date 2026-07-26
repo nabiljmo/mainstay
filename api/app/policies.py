@@ -15,12 +15,32 @@ transaction.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from app.crypto import decrypt, encrypt
 from app.db import connect
 
 STATUSES = ("draft", "active", "expired", "settled")
+
+# Cover must be bound at least this long before planting. Sales for a season
+# close on (planting date - buffer), so a policy can never attach to a season
+# already under way — the guard against buying after the loss has occurred.
+DEFAULT_SALES_CUTOFF_DAYS = 14
+
+
+def covered_season(plant_start: str, today: date,
+                   cutoff_days: int = DEFAULT_SALES_CUTOFF_DAYS) -> tuple[int, date]:
+    """The season a policy bound `today` covers: the next planting whose sales
+    window is still open. Once this year's window has closed, the sale rolls to
+    next year's season — so a mid-season buyer is covered for the season *ahead*,
+    never the one already running (and already in loss)."""
+    month, day = (int(x) for x in plant_start.split("-"))
+    year = today.year
+    cutoff = date(year, month, day) - timedelta(days=cutoff_days)
+    if today > cutoff:
+        year += 1
+        cutoff = date(year, month, day) - timedelta(days=cutoff_days)
+    return year, cutoff
 # Allowed manual transitions (draft->active happens via receipt, not here).
 _TRANSITIONS = {
     ("active", "expired"),
@@ -37,6 +57,7 @@ CREATE TABLE IF NOT EXISTS master_policies (
     country           TEXT NOT NULL,
     crop              TEXT NOT NULL,
     season            TEXT NOT NULL,
+    season_year       INT,                    -- the season instance this covers
     status            TEXT NOT NULL DEFAULT 'draft',
     receipt_ref       TEXT,
     receipt_date      DATE,
@@ -68,6 +89,9 @@ CREATE INDEX IF NOT EXISTS idx_master_nav ON master_policies (country, product_i
 def init_schema() -> None:
     with connect() as conn:
         conn.execute(SCHEMA)
+        # Backfill the column onto pre-existing tables (CREATE IF NOT EXISTS
+        # never alters an existing table).
+        conn.execute("ALTER TABLE master_policies ADD COLUMN IF NOT EXISTS season_year INT")
 
 
 class BindError(Exception):
@@ -153,11 +177,20 @@ def bind_policy(sale_type: str, partner_name: str | None, product_id: str | None
 
     with connect() as conn:
         prod = conn.execute(
-            "SELECT country, crop, season FROM published_products WHERE id = %s",
+            "SELECT country, crop, season, definition FROM published_products WHERE id = %s",
             (product_id,)).fetchone()
     if not prod:
         raise BindError(f"no published product {product_id}")
-    country, crop, season = prod
+    country, crop, season, definition = prod
+
+    # Stamp the season this cover applies to: the next one whose sales window is
+    # still open. This is what stops a policy attaching to a season already in
+    # progress (and already in loss).
+    plant_start = (definition or {}).get("plant_start")
+    season_year, sales_cutoff = (None, None)
+    if plant_start:
+        cutoff_days = int((definition or {}).get("sales_cutoff_days", DEFAULT_SALES_CUTOFF_DAYS))
+        season_year, sales_cutoff = covered_season(plant_start, date.today(), cutoff_days)
 
     resolved = [_resolve_entry(e, product_id, created_by) for e in entries]
     total_si = round(sum(r["sum_insured"] for r in resolved), 2)
@@ -169,10 +202,10 @@ def bind_policy(sale_type: str, partner_name: str | None, product_id: str | None
             conn.execute(
                 """INSERT INTO master_policies
                    (id, sale_type, partner_name, product_id, country, crop, season,
-                    status, total_sum_insured, total_premium, created_by)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s)""",
+                    season_year, status, total_sum_insured, total_premium, created_by)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s)""",
                 (policy_id, sale_type, partner_name, product_id, country, crop, season,
-                 total_si, total_prem, created_by))
+                 season_year, total_si, total_prem, created_by))
             for r in resolved:
                 conn.execute(
                     """INSERT INTO policy_schedule
@@ -186,6 +219,8 @@ def bind_policy(sale_type: str, partner_name: str | None, product_id: str | None
     return {
         "id": policy_id, "sale_type": sale_type, "partner_name": partner_name,
         "product_id": product_id, "country": country, "crop": crop, "season": season,
+        "season_year": season_year,
+        "sales_cutoff": sales_cutoff.isoformat() if sales_cutoff else None,
         "status": "draft", "farmers": len(resolved),
         "total_sum_insured": total_si, "total_premium": total_prem,
     }
@@ -231,13 +266,13 @@ def _master_row(r) -> dict:
         "country": r[4], "crop": r[5], "season": r[6], "status": r[7],
         "receipt_ref": r[8], "receipt_date": r[9].isoformat() if r[9] else None,
         "total_sum_insured": r[10], "total_premium": r[11], "created_by": r[12],
-        "created_at": r[13].isoformat(),
+        "created_at": r[13].isoformat(), "season_year": r[14],
     }
 
 
 _MASTER_COLS = ("id, sale_type, partner_name, product_id, country, crop, season, status, "
                 "receipt_ref, receipt_date, total_sum_insured, total_premium, created_by, "
-                "created_at")
+                "created_at, season_year")
 
 
 def get_master(policy_id: str) -> dict | None:

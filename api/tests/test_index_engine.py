@@ -149,6 +149,17 @@ def test_excess_triggers_from_high_tail():
     assert strike > np.percentile(history, 50)
 
 
+def test_default_strike_targets_1_to_2_years_in_10():
+    """Affordability default: the strike sits in the tail (15th/85th pct), so the
+    cover fires ~1-2 years in 10, not 3."""
+    history = list(range(100))  # 0..99
+    d_strike, d_exit = propose_triggers(history, DEFICIT)
+    assert d_strike == pytest.approx(np.percentile(history, 15), abs=1.0)
+    assert d_exit == pytest.approx(np.percentile(history, 5), abs=1.0)
+    e_strike, _ = propose_triggers(history, EXCESS)
+    assert e_strike == pytest.approx(np.percentile(history, 85), abs=1.0)
+
+
 # ---------------- percentage triggers ----------------
 
 def test_percent_triggers_resolve_against_reference():

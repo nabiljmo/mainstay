@@ -103,9 +103,10 @@ def _active_schedule(product_id: str, season_year: int) -> list[dict]:
                JOIN master_policies m ON m.id = s.master_policy_id
                WHERE m.product_id = %s
                  AND m.status = 'active'
-                 AND EXTRACT(YEAR FROM m.created_at) = %s
+                 AND (m.season_year = %s
+                      OR (m.season_year IS NULL AND EXTRACT(YEAR FROM m.created_at) = %s))
                ORDER BY s.master_policy_id, s.id""",
-            (product_id, season_year),
+            (product_id, season_year, season_year),
         ).fetchall()
     return [
         {"schedule_id": r[0], "policy_id": r[1], "zone": int(r[2]),
