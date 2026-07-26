@@ -403,6 +403,7 @@ function startBind(q){
   document.getElementById('bindbox').innerHTML='<div class="card">'+
     '<label>Farmer name<input id="fname" autocomplete="name"></label>'+
     '<label>Phone<input id="fphone" inputmode="tel"></label>'+
+    '<label>Email (optional — for the policy document)<input id="femail" type="email" inputmode="email" autocomplete="email"></label>'+
     '<label>Gender<select id="fgender"><option value="">—</option>'+
       '<option value="F">Female</option><option value="M">Male</option></select></label>'+
     '<label>National ID (optional)<input id="fid"></label>'+
@@ -411,7 +412,7 @@ function startBind(q){
   document.getElementById('dobind').addEventListener('click',function(){doBind(q)});
 }
 function doBind(q){
-  var f={name:val('fname'),phone:val('fphone'),gender:val('fgender'),national_id:val('fid')};
+  var f={name:val('fname'),phone:val('fphone'),email:val('femail'),gender:val('fgender'),national_id:val('fid')};
   if(!f.name||!f.phone){document.getElementById('binderr').textContent='Name and phone are required.';return}
   var btn=document.getElementById('dobind');btn.disabled=true;btn.textContent='Binding…';
   fetch('/policies',{method:'POST',headers:{'Content-Type':'application/json'},

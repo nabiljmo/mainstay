@@ -746,12 +746,21 @@ def bind_policy_endpoint(req: BindRequest, user: dict = Depends(AGENT)) -> dict:
     from app.policies import BindError, bind_policy
 
     try:
-        return bind_policy(
+        result = bind_policy(
             req.sale_type, req.partner_name, req.product_id,
             [e.model_dump() for e in req.entries], user["username"],
         )
     except BindError as e:
         raise HTTPException(400, str(e))
+
+    # Email the insured their policy document — best-effort, off the request path.
+    try:
+        from app.worker import email_policy_documents
+
+        email_policy_documents.delay(result["id"])
+    except Exception:
+        pass  # a mail/broker hiccup must never fail a bind
+    return result
 
 
 @app.get("/policies")

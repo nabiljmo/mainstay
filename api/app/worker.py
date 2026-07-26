@@ -191,6 +191,15 @@ def settle_due(self, product_id: str | None = None, season_year: int | None = No
 
 
 @celery_app.task(bind=True)
+def email_policy_documents(self, policy_id: str) -> dict:
+    """Email the insured their policy document (PDF) after binding. No-op when no
+    mailer is configured or no email is on file."""
+    from app.notify import send_policy_documents
+
+    return send_policy_documents(policy_id)
+
+
+@celery_app.task(bind=True)
 def demo_job(self, steps: int = 5) -> dict:
     """Walking-skeleton job: proves the api -> broker -> worker -> result
     round-trip that every real job (fetching, zoning, pricing) will use."""

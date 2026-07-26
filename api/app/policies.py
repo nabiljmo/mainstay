@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS policy_schedule (
     premium          DOUBLE PRECISION NOT NULL,
     name_enc         TEXT NOT NULL,
     phone_enc        TEXT NOT NULL,
+    email_enc        TEXT,
     national_id_enc  TEXT,
     gender           TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -92,6 +93,7 @@ def init_schema() -> None:
         # Backfill the column onto pre-existing tables (CREATE IF NOT EXISTS
         # never alters an existing table).
         conn.execute("ALTER TABLE master_policies ADD COLUMN IF NOT EXISTS season_year INT")
+        conn.execute("ALTER TABLE policy_schedule ADD COLUMN IF NOT EXISTS email_enc TEXT")
 
 
 class BindError(Exception):
@@ -147,6 +149,7 @@ def _resolve_entry(entry: dict, product_id: str, created_by: str) -> dict:
         "premium": premium,
         "name_enc": encrypt(name),
         "phone_enc": encrypt(phone),
+        "email_enc": encrypt((farmer.get("email") or "").strip() or None),
         "national_id_enc": encrypt((farmer.get("national_id") or "").strip() or None),
         "gender": (farmer.get("gender") or None),
     }
@@ -210,11 +213,12 @@ def bind_policy(sale_type: str, partner_name: str | None, product_id: str | None
                 conn.execute(
                     """INSERT INTO policy_schedule
                        (master_policy_id, quote_reference, zone, sum_insured,
-                        premium_rate, premium, name_enc, phone_enc, national_id_enc, gender)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        premium_rate, premium, name_enc, phone_enc, email_enc,
+                        national_id_enc, gender)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (policy_id, r["quote_reference"], r["zone"], r["sum_insured"],
                      r["premium_rate"], r["premium"], r["name_enc"], r["phone_enc"],
-                     r["national_id_enc"], r["gender"]))
+                     r["email_enc"], r["national_id_enc"], r["gender"]))
 
     return {
         "id": policy_id, "sale_type": sale_type, "partner_name": partner_name,
@@ -290,7 +294,7 @@ def get_policy(policy_id: str) -> dict | None:
     with connect() as conn:
         rows = conn.execute(
             """SELECT id, quote_reference, zone, sum_insured, premium_rate, premium,
-                      name_enc, phone_enc, national_id_enc, gender
+                      name_enc, phone_enc, national_id_enc, gender, email_enc
                FROM policy_schedule WHERE master_policy_id=%s ORDER BY id""",
             (policy_id,)).fetchall()
     master["schedule"] = [
@@ -298,7 +302,8 @@ def get_policy(policy_id: str) -> dict | None:
             "id": s[0], "quote_reference": s[1], "zone": s[2], "sum_insured": s[3],
             "premium_rate": s[4], "premium": s[5],
             "farmer": {"name": decrypt(s[6]), "phone": decrypt(s[7]),
-                       "national_id": decrypt(s[8]), "gender": s[9]},
+                       "national_id": decrypt(s[8]), "gender": s[9],
+                       "email": decrypt(s[10])},
         }
         for s in rows
     ]
@@ -411,6 +416,8 @@ def render_policy_document(policy_id: str) -> str | None:
   footer {{ margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e3eaf3;
            color: #93a2b8; font-size: 0.78rem; }}
   ul {{ font-size: 0.86rem; }}
+  ol.terms {{ font-size: 0.84rem; padding-left: 1.2rem; color: #24344a; }}
+  ol.terms li {{ margin: 0.4rem 0; }}
   @media print {{ body {{ margin: 0; }} h2, h3 {{ break-after: avoid; }} }}
 </style></head><body>
 <header>
@@ -445,18 +452,71 @@ def render_policy_document(policy_id: str) -> str | None:
 <h2>What the cover types mean</h2>
 <ul>{glossary}</ul>
 
+<h2>Policy terms &amp; conditions</h2>
 <div class="legal">
-  <strong>Terms &amp; conditions.</strong>
-  <span class="ph">[To be completed by the insurer. Insert the licensed insuring entity's
-  legal name and address, the regulator and licence number, the full policy terms and
-  conditions, the claims and complaints procedure, the cooling-off period, and the
-  governing law. This schedule states the cover purchased; it becomes a binding contract
-  only alongside those terms, which must be reviewed and issued by the insurer's counsel.]</span>
+  <span class="ph">Generic pilot terms — draft for review. The clauses below are standard
+  index-insurance terms provided as a starting point for the pilot. They must be reviewed,
+  completed and approved by the insurer's counsel and regulator before commercial issue,
+  and the bracketed items filled in. This is not legal advice.</span>
 </div>
+<ol class="terms">
+  <li><strong>The contract.</strong> This schedule, together with these terms, forms the
+    policy between the insured named above and the insurer. Cover applies only to the
+    season, zone and stages shown in the schedule.</li>
+  <li><strong>Nature of cover — index (parametric) insurance.</strong> This is index-based
+    insurance. A payout is determined solely by a rainfall index measured against the
+    triggers in the schedule — not by the insured's actual loss. No claim, field
+    inspection, or proof of loss is required; payment is automatic when the index breaches
+    a trigger.</li>
+  <li><strong>The index.</strong> The index is the area-average CHIRPS rainfall for the
+    insured's zone, measured for each covered stage from satellite and rain-gauge data
+    published by the Climate Hazards Center. Settlement is made on final CHIRPS data. That
+    data is the sole and conclusive basis for determining any payout.</li>
+  <li><strong>How a payout is calculated.</strong> Each covered stage pays on a straight
+    line from its strike (0%) to its exit (100% of that stage's limit). Stage payouts are
+    added together and the total payable can never exceed the sum insured. One payment is
+    made per insured after the season ends.</li>
+  <li><strong>Basis risk — please read.</strong> Because payment follows the index and not
+    the insured's own field, the payout may not match the actual loss. The policy may pay
+    when little or no loss occurred, and may not pay when a loss did occur. The insured
+    acknowledges and accepts this basis risk as a feature of index insurance.</li>
+  <li><strong>Premium.</strong> Cover is conditional on the premium being paid in full. If
+    the premium is not received, no cover is in force.</li>
+  <li><strong>Period of cover.</strong> Cover applies only to the season stated in the
+    schedule. Cover cannot be bought for a season that has already begun.</li>
+  <li><strong>Payment of benefits.</strong> Any payout is made through the insured's
+    recorded payment channel, after settlement on final data.</li>
+  <li><strong>Personal data.</strong> The insured's personal data is held only to
+    administer this policy and is processed in accordance with
+    <span class="ph">[applicable data-protection law]</span>.</li>
+  <li><strong>Fraud and misrepresentation.</strong> <span class="ph">[Insert the insurer's
+    fraud and misrepresentation terms.]</span></li>
+  <li><strong>Cancellation and cooling-off.</strong> <span class="ph">[Insert the
+    cooling-off period and cancellation terms.]</span></li>
+  <li><strong>Complaints and disputes.</strong> <span class="ph">[Insert the complaints
+    procedure and dispute-resolution mechanism.]</span></li>
+  <li><strong>Governing law.</strong> This policy is governed by the laws of
+    <span class="ph">[jurisdiction]</span>.</li>
+  <li><strong>The insurer.</strong> This cover is underwritten by
+    <span class="ph">[licensed insurer legal name]</span>, licensed and regulated by
+    <span class="ph">[regulator and licence number]</span>.</li>
+</ol>
 
 <footer>This document is a policy schedule generated by the platform. The figures above
-reflect the cover recorded at binding. It is not legal advice.</footer>
+reflect the cover recorded at binding. The terms are generic pilot wording and are not
+legal advice; final terms must be issued by the insurer.</footer>
 </body></html>"""
+
+
+def policy_document_pdf(policy_id: str) -> bytes | None:
+    """The policy schedule rendered to PDF (for emailing). None if no such policy.
+    weasyprint is imported lazily so the rest of the app runs without it."""
+    html = render_policy_document(policy_id)
+    if html is None:
+        return None
+    from weasyprint import HTML
+
+    return HTML(string=html).write_pdf()
 
 
 def list_policies(created_by: str | None = None, *, partner: str | None = None,

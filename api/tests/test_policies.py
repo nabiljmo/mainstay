@@ -168,10 +168,57 @@ def test_policy_document_renders_and_is_access_scoped(env):
     assert "Policy Schedule" in body
     assert "Amina Otieno" in body                 # the insured, decrypted for the owner
     assert "Drought cover" in body                # the cover-type glossary
-    assert "To be completed by the insurer" in body  # legal placeholder, not invented terms
+    assert "Basis risk" in body                   # generic index-insurance terms are present
+    assert "draft for review" in body             # clearly marked as pilot draft, not final
 
     other = make_agent()                          # a different agent can't read it
     assert other.get(f"/policies/{p['id']}/document").status_code == 403
+
+
+def test_bind_captures_email_and_send_gates_cleanly(env):
+    make_agent, pub, admin = env
+    a = make_agent()
+    q = _quote(a)
+    p = a.post("/policies", json={"sale_type": "individual",
+               "entries": [{"quote_reference": q["reference"],
+                            "farmer": {**FARMER, "email": "farmer@example.com"}}]}).json()
+
+    # Email captured, encrypted, decrypted back for the owner.
+    detail = a.get(f"/policies/{p['id']}").json()
+    assert detail["schedule"][0]["farmer"]["email"] == "farmer@example.com"
+
+    # With no mailer configured, sending is a clean no-op — it never raises.
+    from app.notify import send_policy_documents
+
+    out = send_policy_documents(p["id"])
+    assert out["sent"] == 0 and out["reason"] == "email not configured"
+
+
+def test_send_skips_when_no_email_on_file(env):
+    make_agent, pub, admin = env
+    a = make_agent()
+    q = _quote(a)
+    p = a.post("/policies", json={"sale_type": "individual",
+               "entries": [{"quote_reference": q["reference"], "farmer": FARMER}]}).json()
+    from app.notify import send_policy_documents
+
+    out = send_policy_documents(p["id"])
+    assert out["sent"] == 0 and out["reason"] == "no email on file"
+
+
+def test_policy_document_pdf_is_a_pdf(env):
+    make_agent, pub, admin = env
+    a = make_agent()
+    q = _quote(a)
+    p = a.post("/policies", json={"sale_type": "individual",
+               "entries": [{"quote_reference": q["reference"], "farmer": FARMER}]}).json()
+    try:
+        from app.policies import policy_document_pdf
+
+        pdf = policy_document_pdf(p["id"])
+    except Exception as e:  # weasyprint's system libs aren't present in every env
+        pytest.skip(f"weasyprint not usable here: {e}")
+    assert pdf and pdf[:4] == b"%PDF"
 
 
 def test_bind_stamps_the_covered_season(env):

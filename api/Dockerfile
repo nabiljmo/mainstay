@@ -1,5 +1,10 @@
 FROM python:3.12-slim
-RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 \
+# libexpat1 for rasterio; the pango/cairo/harfbuzz set is weasyprint's runtime
+# dependency for rendering the policy-document PDF.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libexpat1 \
+      libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libffi8 \
+      libjpeg62-turbo fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /srv
 COPY pyproject.toml ./
