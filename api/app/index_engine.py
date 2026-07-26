@@ -28,6 +28,17 @@ EXCESS = "excess"
 DRY_SPELL = "dry_spell"
 COVER_TYPES = (DEFICIT, EXCESS, DRY_SPELL)
 
+# Plain-language, one-line meaning of each cover type — shown in the workbench
+# and on the farmer's policy document.
+COVER_DESCRIPTIONS = {
+    DEFICIT: "Drought cover — pays when the rain over the stage is too little. "
+             "The drier it gets, the more it pays.",
+    EXCESS: "Flood cover — pays when the rain over the stage is too much. "
+            "The wetter it gets, the more it pays.",
+    DRY_SPELL: "Dry-spell cover — pays when the longest run of dry days in the "
+               "stage is too long, even if the total rain looked fine.",
+}
+
 # A day is "dry" (for dry-spell cover) below this many mm.
 DEFAULT_DRY_THRESHOLD = 2.0
 

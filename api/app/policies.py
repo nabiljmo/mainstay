@@ -305,6 +305,160 @@ def get_policy(policy_id: str) -> dict | None:
     return master
 
 
+def _esc(v) -> str:
+    return "" if v is None else str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def render_policy_document(policy_id: str) -> str | None:
+    """A printable policy schedule for a bound policy — the farmer's proof of
+    cover (open in a browser, Print → Save as PDF). Every factual term comes
+    from the system; the legal wording is left as clearly-marked placeholders
+    for the insurer's own counsel to complete — this is not legal advice."""
+    from datetime import date as _date
+
+    from app.explain import explain_phase
+    from app.index_engine import COVER_DESCRIPTIONS, phase_from_dict
+    from app.publish import get_published
+
+    master = get_policy(policy_id)  # decrypted schedule; caller must authorise first
+    if not master:
+        return None
+    product = get_published(master["product_id"]) or {}
+    definition = product.get("definition", {})
+    plant_start = definition.get("plant_start")
+    zones_def = definition.get("zones", {})
+    season_year = master.get("season_year")
+
+    def _window(start_offset: int, end_offset: int) -> str:
+        if plant_start and season_year:
+            m, d = (int(x) for x in plant_start.split("-"))
+            plant = _date(season_year, m, d)
+            a = plant + timedelta(days=start_offset)
+            b = plant + timedelta(days=end_offset - 1)
+            return f"{a.isoformat()} → {b.isoformat()}"
+        return f"day {start_offset}–{end_offset} after planting"
+
+    # Insured schedule (the farmers under this master policy).
+    sched_rows = "".join(
+        f"<tr><td>{_esc(s['farmer']['name'])}</td><td>{_esc(s['farmer']['phone'])}</td>"
+        f"<td>Zone {_esc(s['zone'])}</td><td>{_esc(f'{s['sum_insured']:,.0f}')}</td>"
+        f"<td>{_esc(f'{s['premium']:,.0f}')}</td></tr>"
+        for s in master["schedule"]
+    )
+
+    # Cover terms for each zone present on the policy.
+    zones_present = sorted({s["zone"] for s in master["schedule"]})
+    terms_blocks = []
+    for zone in zones_present:
+        zdef = zones_def.get(str(zone)) or zones_def.get(zone)
+        if not zdef:
+            continue
+        rows = []
+        for p in zdef["phases"]:
+            rp = phase_from_dict({**p, "trigger_mode": p.get("trigger_mode", "absolute")})
+            covered = float(p.get("limit", 0) or 0) > 0
+            meaning = explain_phase(rp.name, rp.cover_type, p.get("reference"),
+                                    rp.strike, rp.exit_, rp.limit)
+            rows.append(
+                f"<tr class='{'off' if not covered else ''}'>"
+                f"<td>{_esc(rp.name.replace('_', ' '))}"
+                f"{'' if covered else ' <em>(not covered)</em>'}</td>"
+                f"<td>{_esc(rp.cover_type.replace('_', ' '))}</td>"
+                f"<td>{_esc(_window(rp.start_offset, rp.end_offset))}</td>"
+                f"<td>{_esc(f'{rp.limit:,.0f}')}</td>"
+                f"<td class='mean'>{_esc(meaning)}</td></tr>")
+        terms_blocks.append(
+            f"<h3>Zone {_esc(zone)} — cover terms</h3>"
+            f"<table><thead><tr><th>Stage</th><th>Cover</th><th>Window</th>"
+            f"<th>Max payout</th><th>What it means</th></tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody></table>")
+    terms_html = "".join(terms_blocks) or "<p>Cover terms unavailable.</p>"
+
+    glossary = "".join(f"<li><strong>{_esc(k)}:</strong> {_esc(v)}</li>"
+                       for k, v in COVER_DESCRIPTIONS.items())
+    season_label = f"{_esc(master['season'].replace('_', ' '))}"
+    if season_year:
+        season_label += f" {season_year}"
+    receipt = (f"receipt {_esc(master['receipt_ref'])} ({_esc(master['receipt_date'])})"
+               if master.get("receipt_ref") else "premium not yet receipted")
+
+    return f"""<!doctype html><html><head><meta charset="utf-8">
+<title>Policy schedule — {_esc(master['id'])}</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  body {{ font-family: system-ui, sans-serif; color: #0f1f33; max-width: 860px;
+         margin: 2rem auto; padding: 0 1.5rem; line-height: 1.5; }}
+  header {{ border-bottom: 3px solid #1d9bf0; padding-bottom: 1rem; margin-bottom: 1.25rem; }}
+  h1 {{ font-size: 1.4rem; margin: 0 0 0.25rem; }}
+  h2 {{ font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.6px;
+        color: #5f7089; margin: 1.75rem 0 0.6rem; }}
+  h3 {{ font-size: 0.95rem; margin: 1.1rem 0 0.4rem; }}
+  .sub {{ color: #5f7089; font-size: 0.9rem; }}
+  table {{ border-collapse: collapse; width: 100%; font-size: 0.86rem; margin-top: 0.3rem; }}
+  th, td {{ border: 1px solid #e3eaf3; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }}
+  th {{ background: #f6f9fd; font-weight: 600; }}
+  tr.off td {{ color: #93a2b8; }}
+  td.mean {{ font-size: 0.8rem; color: #33465f; }}
+  .kv {{ display: grid; grid-template-columns: 210px 1fr; gap: 0.35rem 1rem; font-size: 0.9rem; }}
+  .kv dt {{ color: #5f7089; }}
+  .kv dd {{ margin: 0; font-weight: 500; }}
+  .badge {{ display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+           letter-spacing: 0.4px; padding: 0.12rem 0.5rem; border-radius: 99px;
+           background: #d9edfd; color: #0b6bcb; }}
+  .legal {{ background: #fff8e6; border: 1px solid #f0d98c; border-radius: 8px;
+           padding: 0.9rem 1.1rem; margin-top: 1.5rem; font-size: 0.83rem; }}
+  .legal .ph {{ color: #92600e; font-style: italic; }}
+  footer {{ margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e3eaf3;
+           color: #93a2b8; font-size: 0.78rem; }}
+  ul {{ font-size: 0.86rem; }}
+  @media print {{ body {{ margin: 0; }} h2, h3 {{ break-after: avoid; }} }}
+</style></head><body>
+<header>
+  <h1>Weather Index Insurance — Policy Schedule</h1>
+  <div class="sub">Policy {_esc(master['id'])} · <span class="badge">{_esc(master['status'])}</span>
+    · issued {_esc(master['created_at'][:10])}</div>
+</header>
+
+<h2>Policy summary</h2>
+<dl class="kv">
+  <dt>Product</dt><dd>{_esc(master['crop'])} · {season_label} · {_esc(master['country'])}</dd>
+  <dt>Sale type</dt><dd>{_esc(master['sale_type'])}{f" — {_esc(master['partner_name'])}" if master.get('partner_name') else ''}</dd>
+  <dt>Total sum insured</dt><dd>{_esc(f"{master['total_sum_insured']:,.0f}")}</dd>
+  <dt>Total premium</dt><dd>{_esc(f"{master['total_premium']:,.0f}")} — {receipt}</dd>
+  <dt>Season covered</dt><dd>{season_label}</dd>
+</dl>
+
+<h2>Insured</h2>
+<table><thead><tr><th>Name</th><th>Phone</th><th>Zone</th><th>Sum insured</th><th>Premium</th></tr></thead>
+<tbody>{sched_rows}</tbody></table>
+
+<h2>Cover terms</h2>
+{terms_html}
+
+<h2>How a payout works</h2>
+<ul>
+  <li>The index is the <strong>area-average CHIRPS rainfall</strong> for your zone — the same rainfall figure for every farmer in the zone, measured from satellite and rain-gauge data. No field visit or claim is needed.</li>
+  <li>Each stage pays as its trigger is breached, up to that stage's maximum, and payouts are settled on <strong>final CHIRPS data</strong> a few weeks after the season ends.</li>
+  <li>There is <strong>one payment per farmer at the end of the season</strong>, paid through your existing channel.</li>
+</ul>
+
+<h2>What the cover types mean</h2>
+<ul>{glossary}</ul>
+
+<div class="legal">
+  <strong>Terms &amp; conditions.</strong>
+  <span class="ph">[To be completed by the insurer. Insert the licensed insuring entity's
+  legal name and address, the regulator and licence number, the full policy terms and
+  conditions, the claims and complaints procedure, the cooling-off period, and the
+  governing law. This schedule states the cover purchased; it becomes a binding contract
+  only alongside those terms, which must be reviewed and issued by the insurer's counsel.]</span>
+</div>
+
+<footer>This document is a policy schedule generated by the platform. The figures above
+reflect the cover recorded at binding. It is not legal advice.</footer>
+</body></html>"""
+
+
 def list_policies(created_by: str | None = None, *, partner: str | None = None,
                   product_id: str | None = None, status: str | None = None,
                   agent: str | None = None, zone: int | None = None) -> list[dict]:

@@ -325,6 +325,10 @@ export default function ProductDesign() {
             </button>
           </div>
           <h3>Phases (editable)</h3>
+          <p className="hint-note" style={{ fontStyle: 'normal' }}>
+            <strong>Deficit</strong> = drought, too little rain. <strong>Excess</strong> = flood, too much rain.
+            <strong> Dry spell</strong> = a long unbroken run of dry days, even if the total was fine.
+          </p>
           <table className="stages">
             <thead>
               <tr>

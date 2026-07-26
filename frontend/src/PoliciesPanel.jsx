@@ -38,6 +38,19 @@ export default function PoliciesPanel() {
       .catch((e) => setError(e.message))
   }
 
+  // Open the printable policy schedule (the farmer's proof of cover) in a new tab.
+  const openDocument = (id) => {
+    setError(null)
+    fetch(`${API}/policies/${id}/document`)
+      .then((r) => { if (!r.ok) throw new Error('could not load the policy document'); return r.blob() })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob)
+        window.open(url, '_blank')
+        setTimeout(() => URL.revokeObjectURL(url), 15000)
+      })
+      .catch((e) => setError(e.message))
+  }
+
   const Badge = ({ s }) => <span className={`pstatus ${s}`}>{s}</span>
 
   return (
@@ -85,6 +98,7 @@ export default function PoliciesPanel() {
             </p>
 
             <div className="loading-actions" style={{ margin: '0.5rem 0 1rem' }}>
+              <button className="secondary" onClick={() => openDocument(detail.id)}>Policy document</button>
               {detail.status === 'active' && (
                 <>
                   <button className="secondary" onClick={() => setStatus(detail.id, 'settled')}>Mark settled</button>

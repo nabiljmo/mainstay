@@ -153,6 +153,27 @@ def test_covered_season_after_cutoff_rolls_to_next_year():
     assert year == 2027 and cutoff == date(2027, 3, 1)
 
 
+def test_policy_document_renders_and_is_access_scoped(env):
+    make_agent, pub, admin = env
+    a = make_agent()
+    q = _quote(a)
+    p = a.post("/policies", json={"sale_type": "individual",
+               "entries": [{"quote_reference": q["reference"], "farmer": FARMER}]}).json()
+
+    doc = a.get(f"/policies/{p['id']}/document")
+    assert doc.status_code == 200
+    assert doc.headers["content-type"].startswith("text/html")
+    body = doc.text
+    assert p["id"] in body
+    assert "Policy Schedule" in body
+    assert "Amina Otieno" in body                 # the insured, decrypted for the owner
+    assert "Drought cover" in body                # the cover-type glossary
+    assert "To be completed by the insurer" in body  # legal placeholder, not invented terms
+
+    other = make_agent()                          # a different agent can't read it
+    assert other.get(f"/policies/{p['id']}/document").status_code == 403
+
+
 def test_bind_stamps_the_covered_season(env):
     from datetime import date
 

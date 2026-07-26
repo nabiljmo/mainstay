@@ -788,6 +788,20 @@ def get_policy_endpoint(policy_id: str, user: dict = Depends(AUTHED)) -> dict:
     return get_policy(policy_id)
 
 
+@app.get("/policies/{policy_id}/document")
+def policy_document_endpoint(policy_id: str, user: dict = Depends(AUTHED)):
+    """The farmer's policy schedule (printable → PDF). Same access as the policy."""
+    from fastapi.responses import HTMLResponse
+
+    from app.policies import render_policy_document
+
+    _policy_or_403(policy_id, user)
+    html = render_policy_document(policy_id)
+    if html is None:
+        raise HTTPException(404, f"No policy {policy_id}")
+    return HTMLResponse(html)
+
+
 class ReceiptRequest(BaseModel):
     reference: str
     date: str | None = None
