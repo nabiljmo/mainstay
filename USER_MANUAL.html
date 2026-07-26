@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mainstay user manual</title>
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['\\(', '\\)']],
+      displayMath: [['\\[', '\\]']]
+    },
+    options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #5a6472;
+    --border: #e3e6ea;
+    --accent: #1f6feb;
+    --code-bg: #f5f6f8;
+    --table-head: #f0f2f5;
+    --callout-bg: #fff7ed;
+    --callout-border: #f59e0b;
+    --maxw: 860px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216;
+      --fg: #e6e8eb;
+      --muted: #9aa4b2;
+      --border: #2a2f37;
+      --accent: #4a9eff;
+      --code-bg: #171b21;
+      --table-head: #1a1f26;
+      --callout-bg: #241a08;
+      --callout-border: #b45309;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+    margin: 0;
+    padding: 2.5rem 1.25rem 6rem;
+    font-size: 16px;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 0.25rem; }
+  h2 {
+    font-size: 1.4rem; margin: 2.75rem 0 0.9rem;
+    padding-bottom: 0.35rem; border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.12rem; margin: 1.75rem 0 0.6rem; }
+  p { margin: 0.7rem 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle { color: var(--muted); font-size: 1.02rem; margin-top: 0; }
+  code {
+    background: var(--code-bg); padding: 0.1rem 0.35rem; border-radius: 4px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.85rem 1rem; overflow-x: auto; font-size: 0.86rem; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.95rem; display: block; overflow-x: auto; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--table-head); font-weight: 600; }
+  ul, ol { padding-left: 1.4rem; }
+  li { margin: 0.3rem 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .toc { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .toc h2 { border: none; margin: 0 0 0.5rem; font-size: 1.1rem; padding: 0; }
+  .toc ol { columns: 2; column-gap: 2rem; margin: 0; }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+  .mathblock { overflow-x: auto; padding: 0.4rem 0; }
+  .callout {
+    background: var(--callout-bg); border-left: 4px solid var(--callout-border);
+    border-radius: 6px; padding: 0.75rem 1rem; margin: 1.25rem 0;
+  }
+  .callout strong { display: block; margin-bottom: 0.25rem; }
+  .lede { color: var(--muted); }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Mainstay user manual</h1>
+<p class="subtitle">A platform for building and running weather index insurance.</p>
+
+<p>Mainstay creates agro-ecological zones for a country from rainfall data, designs insurance products against that rainfall, prices them, publishes them, quotes them, records policies, and settles claims from the rainfall record at the end of the season. This manual explains what each screen does and gives the exact formulas used for pricing, expected loss, and payouts.</p>
+
+<div class="toc">
+<h2>Contents</h2>
+<ol>
+  <li><a href="#s1">What the platform does</a></li>
+  <li><a href="#s2">Workflow overview</a></li>
+  <li><a href="#s3">User roles</a></li>
+  <li><a href="#s4">Signing in</a></li>
+  <li><a href="#s5">Rainfall data</a></li>
+  <li><a href="#s6">Zoning</a></li>
+  <li><a href="#s7">Crop library</a></li>
+  <li><a href="#s8">Product design</a></li>
+  <li><a href="#s9">Pricing mathematics</a></li>
+  <li><a href="#s10">Publishing</a></li>
+  <li><a href="#s11">Quoting</a></li>
+  <li><a href="#s12">Binding (policies)</a></li>
+  <li><a href="#s13">Season and settlement</a></li>
+  <li><a href="#s14">Payout run</a></li>
+  <li><a href="#s15">Operations (demand signals)</a></li>
+  <li><a href="#s16">Users</a></li>
+  <li><a href="#s17">Open standards and open source</a></li>
+  <li><a href="#s18">Limitations</a></li>
+  <li><a href="#s19">Symbol reference</a></li>
+  <li><a href="#s20">Glossary</a></li>
+  <li><a href="#s21">Appendix: running and deploying</a></li>
+  <li><a href="#s22">Disclaimer and licence</a></li>
+</ol>
+</div>
+
+<h2 id="s1">1. What the platform does</h2>
+<p>A weather index insurance product pays out based on a measured rainfall index, not on a visit to the farm. If the rainfall over a defined period crosses a defined line, the product pays a defined amount. No loss adjuster is involved.</p>
+<p>Mainstay uses one rainfall dataset (CHIRPS) for both pricing and settlement, so the amount computed at pricing and the amount computed at settlement use the same code.</p>
+
+<h2 id="s2">2. Workflow overview</h2>
+<p>A product moves through six stages:</p>
+<ol>
+  <li>Design — an actuary selects a country, zone map, crop, and season. The platform proposes phases, cover types, and triggers.</li>
+  <li>Price — for each zone, the platform computes historical payouts, an expected loss, loadings, and a premium rate.</li>
+  <li>Publish — the actuary freezes the product as a numbered, read-only version and records every assumption behind the rates.</li>
+  <li>Quote — a field agent supplies a location, crop, season, and sum insured, and receives a premium from the published rate table.</li>
+  <li>Bind — the agent records the farmers who bought, under a master policy. On premium receipt, the policy becomes active.</li>
+  <li>Settle — the platform reads the season's rainfall, computes what is owed after the final data is available, and prepares one payment per farmer.</li>
+</ol>
+
+<h2 id="s3">3. User roles</h2>
+<p>There are five roles. Each role sees only its own screens. The server checks the role on every request, so access is enforced on the API, not only in the interface.</p>
+<table>
+  <thead><tr><th>Role</th><th>Screens</th></tr></thead>
+  <tbody>
+    <tr><td>Actuary</td><td>Zoning, Products</td></tr>
+    <tr><td>Agronomist</td><td>Crop library</td></tr>
+    <tr><td>Operations</td><td>Policies, Season, Payout, Operations</td></tr>
+    <tr><td>Agent</td><td>Field quoting page (separate, lightweight)</td></tr>
+    <tr><td>Admin</td><td>All screens, plus Users</td></tr>
+  </tbody>
+</table>
+<p>The system does not allow the last active admin to be removed or demoted.</p>
+
+<h2 id="s4">4. Signing in</h2>
+<p>Enter your username and password on the sign-in screen. The session is held in a secure cookie sent with each request. Use Sign out in the top right to end the session.</p>
+<p>Three status indicators appear at the top: <code>api</code> (the web service), <code>db</code> (the database), and <code>worker</code> (the background job runner for fetching, zoning, pricing, and settlement). Green means the component is reachable. Red means a job may fail or a screen may not load.</p>
+
+<h2 id="s5">5. Rainfall data</h2>
+<h3>5.1 Source</h3>
+<p>Mainstay downloads CHIRPS-2.0, the daily 0.05 degree Africa product, from the Climate Hazards Center at the University of California, Santa Barbara:</p>
+<pre><code>https://data.chc.ucsb.edu/products/CHIRPS-2.0/africa_daily/tifs/p05</code></pre>
+<p>The platform does not generate rainfall data and does not ship a bundled dataset. It fetches this public dataset on first use and caches it. The cache can be deleted and re-fetched. The public source is authoritative.</p>
+
+<h3>5.2 Fetching</h3>
+<p>On the zoning screen, in the Weather data panel: select a country, set a start year and end year, and press Fetch CHIRPS data. A background job downloads each day, crops it to the country's bounding box, and stores the year. Fetched years appear under Cached years. A year already cached is not downloaded again.</p>
+
+<h3>5.3 History depth and the quality flag</h3>
+<p>You choose how many years to fetch. Five years is the recommended minimum. The record extends back to 1981. A data-quality flag is shown by depth of history, where \(n\) is the number of years used:</p>
+<div class="mathblock">\[
+\text{flag} =
+\begin{cases}
+\text{green} & n \ge 15 \\
+\text{amber} & 10 \le n \le 14 \\
+\text{red}   & n < 10
+\end{cases}
+\]</div>
+<p>The flag is advisory and does not block any action. A short history can understate the frequency and size of rare events.</p>
+
+<h3>5.4 Provenance</h3>
+<p>Each cached country-year records: dataset name, source address, country bounding box, pixel grid, number of days retrieved, list of missing days, and the fetch timestamp. Days that CHIRPS has not published are recorded as missing and are not filled with substitute values.</p>
+
+<h3>5.5 Zone rainfall index</h3>
+<p>CHIRPS is a gridded dataset at 0.05 degrees (about 5.5 km per cell). A zone's rainfall on a given day \(d\) is the mean of the grid cells whose centres fall inside the zone polygon:</p>
+<div class="mathblock">\[
+R_{\text{zone}}(d) = \operatorname{mean}\big\{\, R_{\text{cell}}(d) \;:\; \text{cell centre} \in \text{zone} \,\big\}
+\]</div>
+<p>All farmers in a zone share this single daily series.</p>
+
+<h2 id="s6">6. Zoning</h2>
+<p>A zone map divides a country into areas with similar rainfall behaviour. There is one zone map per country, shared across all crops and seasons.</p>
+
+<h3>6.1 Running a zoning pass</h3>
+<p>In the Zoning panel, set the year range (the rainfall history used), the number of zones, the rainfall sensitivity (how strongly the grouping uses rainfall behaviour relative to location), and optionally Align zones to districts (each administrative district is assigned whole to its majority zone). Press Run zoning. The background worker performs the clustering and draws the map.</p>
+
+<h3>6.2 Features and clustering</h3>
+<p>For each pixel \(i\), the platform computes two rainfall features across the chosen years: the mean annual total and the coefficient of variation.</p>
+<div class="mathblock">\[
+m_i = \operatorname{mean}_{y}\big(\text{annual total}_{i,y}\big),
+\qquad
+cv_i = \frac{\operatorname{std}_{y}(\text{annual total}_{i,y})}{\operatorname{mean}_{y}(\text{annual total}_{i,y})}
+\]</div>
+<p>The coefficient of variation measures year-to-year variability. Two places with the same average rainfall can fail with different frequency; \(cv\) separates them. Longitude and latitude are centred and scaled by one shared factor so the country's shape is not distorted:</p>
+<div class="mathblock">\[
+lon_c = lon - \overline{lon}, \qquad lat_c = lat - \overline{lat},
+\qquad
+\text{scale} = \sqrt{\operatorname{mean}\!\big(lon_c^2 + lat_c^2\big)}
+\]</div>
+<p>Each rainfall feature is standardised and multiplied by the sensitivity \(s\), where \(z(x) = \dfrac{x - \bar{x}}{\operatorname{std}(x)}\). The feature vector for pixel \(i\) is:</p>
+<div class="mathblock">\[
+\mathbf{f}_i = \left[\; \frac{lon_c}{\text{scale}},\;\; \frac{lat_c}{\text{scale}},\;\; z(m_i)\cdot s,\;\; z(cv_i)\cdot s \;\right]
+\]</div>
+<p>These vectors are clustered with k-means into \(k\) zones, using a fixed random seed. The same inputs and seed produce the same zones every time.</p>
+
+<h3>6.3 Homogeneity</h3>
+<p>Each zone has a homogeneity score. Let \(T_i\) be the annual-total series of member cell \(i\), and \(\bar{T}_z\) the zone's mean annual-total series. The homogeneity is the mean correlation of the members with the zone mean, clipped to \([-1, 1]\):</p>
+<div class="mathblock">\[
+H(z) = \operatorname{mean}_{i \in z}\; \operatorname{corr}\!\big(T_i,\; \bar{T}_z\big)
+\]</div>
+<p>Higher values mean the cells in the zone move together, so one index represents them well. The score needs at least three years of data; below that it is shown as not available.</p>
+
+<h3>6.4 Approving</h3>
+<p>Draft runs are listed so you can compare them. When a map is acceptable, press Approve. This freezes it as a named version (for example <code>KEN-v3</code>) and records who approved it and when. Boundaries cannot be hand-edited in version 1. A different map requires a new run and a new approved version.</p>
+
+<h2 id="s7">7. Crop library</h2>
+<p>The crop library holds the crop data that products are built from. It is versioned and editable.</p>
+
+<h3>7.1 Contents</h3>
+<p>Open the Crop library tab and select a crop. Each crop has two tables. Growth stages: four stages (establishment, vegetative, flowering, grain filling), each with a duration in days and a water-stress sensitivity weight; the weights sum to 1. Planting windows: one row per country and season, giving the sowing window as a start and end date (MM-DD). You can edit durations, weights, and windows, add and remove planting-window rows, and add a new crop. Press Save as new version to store changes.</p>
+
+<h3>7.2 Versions and review</h3>
+<p>Saving creates a new numbered version. Old versions are immutable. A product priced against version 2 keeps version 2 permanently. Each crop has a reviewed flag. Crops seeded from public sources start unreviewed. They hold starting values from the FAO crop calendars and FAO water-requirement literature. An agronomist should confirm the stages and the local sowing window and save with the reviewed flag set.</p>
+
+<h3>7.3 Seeded crops</h3>
+<p>The platform ships with a library of common African crops: maize, sorghum, pearl millet, finger millet, rice, groundnut, cowpea, common bean, soybean, sunflower, wheat, cotton, and sesame. Each has planting windows for the countries where it is a major crop. They arrive unreviewed. Seeding is additive: it adds crops the database does not have and does not modify crops already present.</p>
+
+<h3>7.4 From stages to phases and limits</h3>
+<p>Stage durations \(d_1, d_2, \dots\) become phase windows by accumulation from the planting date. Stage \(k\) runs from day \(\sum_{j<k} d_j\) to day \(\sum_{j\le k} d_j\). The sum insured is split across stages in proportion to the sensitivity weights:</p>
+<div class="mathblock">\[
+L_i = \frac{w_i}{\sum_j w_j}\; \cdot\; SI
+\]</div>
+<p>where \(w_i\) is stage \(i\)'s sensitivity weight and \(SI\) is the sum insured. \(L_i\) is the money at risk in phase \(i\).</p>
+
+<h2 id="s8">8. Product design</h2>
+<h3>8.1 Creating a draft</h3>
+<p>Open the Products tab. In the New product panel choose a country (which determines the zone maps and crops shown), a zone map (an approved map for that country; if none exists, drafting is disabled), a crop (only crops with a planting window for the selected country and season appear), a season, and a sum insured. Press Draft product. A background job reads the zone map and crop, pulls each zone's rainfall history, and proposes phases, cover types, and triggers for every zone. All proposed values can be overridden.</p>
+
+<h3>8.2 Cover types</h3>
+<ul>
+  <li>Deficit — pays when total rainfall over the stage is too low (drought). Index = total rainfall.</li>
+  <li>Excess — pays when total rainfall over the stage is too high (flood). Index = total rainfall.</li>
+  <li>Dry spell — pays when the longest run of consecutive dry days in the stage is too long. Index = longest dry run in days.</li>
+</ul>
+
+<h3>8.3 Index formulas</h3>
+<p>For deficit and excess cover, the phase index is the sum of daily rainfall over the phase window \(W\) (missing days count as zero):</p>
+<div class="mathblock">\[
+I = \sum_{d \in W} R_d \quad \text{(mm)}
+\]</div>
+<p>For dry-spell cover, the phase index is the length of the longest run of consecutive days below the dry threshold (2.0 mm by default); a missing day breaks the run:</p>
+<div class="mathblock">\[
+I = \max\big\{\, \text{length of a run of consecutive days } d \text{ with } R_d < 2.0 \,\big\} \quad \text{(days)}
+\]</div>
+
+<h3>8.4 Payout formula</h3>
+<p>The payout is linear between the strike \(S\) and the exit \(E\), capped at the phase limit \(L\). The payout fraction \(f\) is 0 at the strike, 1 at the exit, and linear between, using \(\operatorname{clip}(x,0,1) = \min(1, \max(0, x))\).</p>
+<p>For deficit cover, \(S > E\) (a drier reading pays more):</p>
+<div class="mathblock">\[
+f = \operatorname{clip}\!\left(\frac{S - I}{S - E},\; 0,\; 1\right), \qquad \text{payout} = f \cdot L
+\]</div>
+<p>For excess and dry-spell cover, \(E > S\) (a higher reading pays more):</p>
+<div class="mathblock">\[
+f = \operatorname{clip}\!\left(\frac{I - S}{E - S},\; 0,\; 1\right), \qquad \text{payout} = f \cdot L
+\]</div>
+<p>The year's total payout is the sum of the phase payouts.</p>
+<p><strong>Worked example (deficit).</strong> Strike \(S = 300\) mm, exit \(E = 150\) mm, limit \(L = 4000\), season rainfall \(I = 210\) mm:</p>
+<div class="mathblock">\[
+f = \frac{300 - 210}{300 - 150} = \frac{90}{150} = 0.60,
+\qquad
+\text{payout} = 0.60 \times 4000 = 2400
+\]</div>
+
+<h3>8.5 Triggers: percent or absolute</h3>
+<p>In absolute mode you type the strike and exit in the index's units (mm, or days). In percent mode you type them as a percentage of the phase's normal, the historical mean index for that phase (its \(\text{reference}\)):</p>
+<div class="mathblock">\[
+S = \frac{\text{strike\%}}{100}\cdot \text{reference},
+\qquad
+E = \frac{\text{exit\%}}{100}\cdot \text{reference}
+\]</div>
+
+<h3>8.6 Proposed triggers</h3>
+<p>The starting triggers come from the historical distribution of the phase index, by percentile. Let \(P_k\) be the \(k\)-th percentile of the phase's historical index values.</p>
+<div class="mathblock">\[
+\text{Deficit:} \quad S = P_{15},\; E = P_{5}
+\qquad\qquad
+\text{Excess / dry spell:} \quad S = P_{85},\; E = P_{95}
+\]</div>
+<p>This sets the cover to fire in roughly 1 to 2 years in 10 and to reach the full payout only in an extreme year. These are proposals and can be overridden.</p>
+
+<h3>8.7 Editing helpers</h3>
+<p>Balance to sum insured scales the phase limits so they add to the sum insured while keeping their proportions. The stage toggle un-ticks a stage to set its limit to 0 and rebalances the remaining stages, which builds a single-stage variant. Press Recompute payouts after changes.</p>
+
+<h2 id="s9">9. Pricing mathematics</h2>
+<p>Pricing converts a zone's history of payouts into a premium. This section gives every formula.</p>
+
+<h3>9.1 Loss series</h3>
+<p>Run the product over each historical year to produce one total payout per year: \(x_1, x_2, \dots, x_n\), where \(x_t\) is the total payout in year \(t\) and \(n\) is the number of years.</p>
+
+<h3>9.2 Burning cost</h3>
+<div class="mathblock">\[
+BC = \frac{1}{n}\sum_{t=1}^{n} x_t
+\]</div>
+<p><strong>Worked example.</strong> Losses over 5 years are \([0, 0, 1200, 0, 800]\):</p>
+<div class="mathblock">\[
+BC = \frac{0 + 0 + 1200 + 0 + 800}{5} = \frac{2000}{5} = 400
+\]</div>
+
+<h3>9.3 Payout frequency</h3>
+<div class="mathblock">\[
+p = \frac{\big|\{\, t : x_t > 0 \,\}\big|}{n}
+\]</div>
+<p>In the example, two of five years paid, so \(p = 2/5 = 0.40\).</p>
+
+<h3>9.4 Severity distribution</h3>
+<p>Fit a distribution to the positive payouts only (\(x_t > 0\)), by maximum likelihood. Three distributions are available: gamma (default; shape and scale, location fixed at 0), lognormal (sigma and scale, location fixed at 0), and normal (mean and standard deviation). Call the fitted severity \(Y\).</p>
+
+<h3>9.5 Modelled expected loss</h3>
+<p>The modelled expected loss is a frequency-severity Monte Carlo simulation with \(N = 20{,}000\) runs and a fixed seed. For each run \(j\), an occurrence \(O_j\) is drawn from a Bernoulli distribution with probability \(p\), a severity \(Y_j\) is drawn from the fitted distribution, and the loss is \(O_j\) times that severity clipped to \([0, SI]\):</p>
+<div class="mathblock">\[
+O_j \sim \text{Bernoulli}(p), \qquad Y_j \sim \hat{F}_Y, \qquad
+\text{loss}_j = O_j \cdot \min\!\big(\max(Y_j, 0),\; SI\big)
+\]</div>
+<div class="mathblock">\[
+EL_{\text{model}} = \frac{1}{N}\sum_{j=1}^{N} \text{loss}_j
+\]</div>
+<p>Because occurrence and severity are independent in the simulation, this equals:</p>
+<div class="mathblock">\[
+EL_{\text{model}} = p \cdot \mathbb{E}\!\big[\min(Y, SI)\big]
+\]</div>
+<p>The fixed seed makes this reproducible. If there are fewer than 2 positive payouts, or the positive payouts have no spread, the distribution cannot be fitted and the modelled expected loss falls back to the burning cost: \(EL_{\text{model}} = BC\). A Q-Q plot of the sorted positive payouts against the fitted quantiles is shown so the fit can be checked.</p>
+
+<h3>9.6 Technical expected loss</h3>
+<p>The technical expected loss is the larger of the two, and is the expected loss used for pricing:</p>
+<div class="mathblock">\[
+EL = \max\big(BC,\; EL_{\text{model}}\big)
+\]</div>
+
+<h3>9.7 Loadings</h3>
+<p>Loadings are added on top of the expected loss to reach the gross premium. Each loading has one of three bases: <code>pct_el</code> (a percentage of the expected loss), <code>pct_gross</code> (a percentage of the gross premium), or <code>flat</code> (a fixed amount per policy). The default loadings are:</p>
+<table>
+  <thead><tr><th>Loading</th><th>Basis</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Uncertainty margin</td><td>pct_el</td><td>15%</td></tr>
+    <tr><td>Admin and operations</td><td>pct_gross</td><td>10%</td></tr>
+    <tr><td>Distribution commission</td><td>pct_gross</td><td>15%</td></tr>
+    <tr><td>Profit and capital</td><td>pct_gross</td><td>10%</td></tr>
+  </tbody>
+</table>
+<p>All loadings are editable.</p>
+
+<h3>9.8 Gross premium and rate</h3>
+<p>Let \(EL\) be the technical expected loss, and let each loading have value \(v\). Form the base from the expected loss, the percent-of-EL loadings, and the flat loadings:</p>
+<div class="mathblock">\[
+\text{base} = EL \;+\; \sum_{i \in \text{pct\_el}} EL\cdot\frac{v_i}{100} \;+\; \sum_{k \in \text{flat}} v_k
+\]</div>
+<p>Let \(g\) be the sum of the percent-of-gross loading fractions:</p>
+<div class="mathblock">\[
+g = \sum_{j \in \text{pct\_gross}} \frac{v_j}{100}
+\]</div>
+<p>The gross premium grosses up for the percent-of-gross loadings, which requires \(g < 1\) (otherwise the premium is undefined and the platform refuses to price). The premium rate is the gross premium as a percentage of the sum insured:</p>
+<div class="mathblock">\[
+G = \frac{\text{base}}{1 - g},
+\qquad
+\text{rate} = \frac{100\,G}{SI}\;\;(\%)
+\]</div>
+
+<h3>9.9 Worked example (end to end)</h3>
+<p>Take a technical expected loss \(EL = 400\) and a sum insured \(SI = 10{,}000\), with the default loadings. The only percent-of-EL loading is the 15% uncertainty margin, so:</p>
+<div class="mathblock">\[
+\text{base} = 400 + 400\cdot\frac{15}{100} = 400 + 60 = 460
+\]</div>
+<p>The percent-of-gross loadings are \(10\% + 15\% + 10\% = 35\%\), so \(g = 0.35\):</p>
+<div class="mathblock">\[
+G = \frac{460}{1 - 0.35} = \frac{460}{0.65} = 707.69,
+\qquad
+\text{rate} = \frac{100 \times 707.69}{10{,}000} = 7.08\%
+\]</div>
+<p>The gross premium is 707.69 on a sum insured of 10,000, a rate of 7.08%.</p>
+
+<h3>9.10 Loading amounts</h3>
+<p>The amount of each loading, for the breakdown shown on screen:</p>
+<div class="mathblock">\[
+\text{pct\_el: } EL\cdot\frac{v}{100},
+\qquad
+\text{flat: } v,
+\qquad
+\text{pct\_gross: } G\cdot\frac{v}{100}
+\]</div>
+<p>Using the example (\(EL = 400\), \(G = 707.69\)):</p>
+<pre><code>Uncertainty margin (15% of EL):     400 * 0.15    = 60.00
+Admin (10% of gross):               707.69 * 0.10 = 70.77
+Distribution (15% of gross):        707.69 * 0.15 = 106.15
+Profit and capital (10% of gross):  707.69 * 0.10 = 70.77</code></pre>
+
+<h3>9.11 Consistency of pricing and settlement</h3>
+<p>The same function computes the historical payout table used in pricing and the live payout used in settlement. The engine that prices a product settles it.</p>
+
+<h2 id="s10">10. Publishing</h2>
+<h3>10.1 What publishing does</h3>
+<p>With a draft open, the actuary presses Publish product and confirms. The platform re-prices every zone from the current terms, so the stored rate equals the rate shown on screen. It then freezes the product as a numbered, read-only version and writes an audit record.</p>
+
+<h3>10.2 Validation</h3>
+<p>In every zone, the phase limits must add up to the sum insured within a tolerance of 1 unit or 0.5% of the sum insured, whichever is larger:</p>
+<div class="mathblock">\[
+\Big|\, \textstyle\sum_i L_i - SI \,\Big| \;\le\; \max\big(1.0,\; 0.005 \cdot SI\big)
+\]</div>
+<p>If any zone fails, publishing stops and lists all failing zones.</p>
+
+<h3>10.3 Versioning</h3>
+<p>Products are versioned by country, crop, and season. The version number increments by 1 each time. The identifier has the form <code>{country}-{crop}-{season}-v{version}</code>, for example <code>KEN-maize-long_rains-v1</code>. There is no edit or delete. A change means a new version. Quoting uses only the newest version's rates.</p>
+
+<h3>10.4 Stored rate table</h3>
+<p>For each zone, the published product stores: premium rate, gross premium, expected loss, burning cost, technical expected loss, and data-quality flag.</p>
+
+<h3>10.5 Assumption sheet</h3>
+<p>Every published product stores an assumption sheet recording every input behind the rates:</p>
+<ul>
+  <li>Product: country, crop, crop-library version, crop source, whether the crop was reviewed, season, planting date, sum insured, pricing years.</li>
+  <li>Dataset: dataset name, product, source address, and for each year, the fetch time and the count of missing days.</li>
+  <li>Zone map: name, number of zones, years used, rainfall sensitivity, whether aligned to districts, who approved it, and when.</li>
+  <li>Method: the index definition, the expected-loss rule \(EL = \max(BC, EL_{\text{model}})\), the severity distribution, the gross-up formula, and the full loading list.</li>
+</ul>
+<p>A separate audit record stores the action, who published, when, the source draft, the distribution and loadings, which zones were overridden in the session, and the number of zones. A printable version can be exported by printing to PDF. It shows the crop as reviewed or unreviewed, lists the rate and quality flag for every zone, and states that the rates were produced before any external benchmark was consulted.</p>
+
+<h2 id="s11">11. Quoting</h2>
+<p>Quoting is a lookup against the published rate table. Field agents use a separate lightweight page.</p>
+<h3>11.1 Process</h3>
+<p>An agent supplies a location (a map pin or a picked village), a crop, a season, and a sum insured. The platform converts the location to a point (a picked village uses the representative interior point of its administrative district), finds the zone containing that point by a point-in-polygon test over the product's frozen zone map, looks up the published product for the country, crop, and season, reads the zone's premium rate, and computes the premium.</p>
+<h3>11.2 Premium formula</h3>
+<div class="mathblock">\[
+\text{premium} = \frac{\text{rate}}{100}\cdot SI
+\]</div>
+<p>The response includes a reference number of the form <code>Q-{country}-{yymmdd}-{5 hex}</code>, a plain-language cover summary, a validity date, the data-quality flag, and the exact product version used.</p>
+<h3>11.3 No coverage</h3>
+<p>If no product is published for that country, crop, and season, or the point falls outside every mapped zone, the agent is told coverage is not available. Each such case is logged as a demand signal with a reason (<code>no_product</code> or <code>outside_coverage</code>). An agent sees only their own quotes.</p>
+
+<h2 id="s12">12. Binding (policies)</h2>
+<h3>12.1 Two-level register</h3>
+<p>Every sale is a master policy over a schedule of farmers. A single sale is a master with one farmer. A partner sale is a master with a partner name over many farmers. To bind, operations records the farmers under a master. Each entry is priced from its originating quote if one exists (the quote must exist, match the product, and have been created by the same user), otherwise from the published rate for the zone. An individual sale must have exactly one farmer. A partner sale requires a partner name. The master starts in draft status.</p>
+<h3>12.2 Statuses</h3>
+<pre><code>draft  -> active     (only via premium receipt)
+active -> expired
+active -> settled
+draft  -> expired    (lapsed unpaid)</code></pre>
+<h3>12.3 Premium receipt</h3>
+<p>Mainstay records money, it does not move money. Premium is collected in existing company or partner channels. Recording a receipt (a reference and a date) on a draft policy sets its status to active. Only a draft can be activated this way.</p>
+<h3>12.4 Sales cut-off</h3>
+<p>To limit anti-selection, a policy is stamped at bind time with the next planting season whose sales window is still open. The window closes a set number of days before planting (14 by default):</p>
+<div class="mathblock">\[
+\text{sales cut-off date} = \text{plant\_start} - \text{cutoff\_days}
+\]</div>
+<p>If this year's window has closed, the policy is stamped with next year's season. A late buyer is covered for the season ahead, not the season already running. A product can override the cut-off days.</p>
+<h3>12.5 PII and encryption</h3>
+<p>The farmer fields stored are name, phone, gender, and an optional national ID. The phone is also the payment address. Name, phone, email, and national ID are encrypted at rest using Fernet (AES-128 in CBC mode with an HMAC for integrity). Gender is stored in clear. The encryption key comes from the environment variable <code>AEZ_PII_KEY</code>. In production the host generates and holds this key. The development fallback key is deterministic and is not secret; it must not be used in production. If the key is lost, the data cannot be recovered. If the key is leaked, the at-rest encryption gives no protection. Farmer details are decrypted only in role-scoped views. An agent sees only policies they created. Operations and admin see all policies.</p>
+<h3>12.6 Policy document</h3>
+<p>Operations can produce a printable policy document. It states the cover and includes a basis-risk clause: because the payout follows a rainfall index rather than the individual field, it may pay when little was lost and may not pay when a loss occurred. The legal wording is a placeholder for the insurer's counsel to complete. It is not legal advice and must be reviewed and approved by the insurer's lawyers and regulator before commercial issue.</p>
+
+<h2 id="s13">13. Season and settlement</h2>
+<h3>13.1 Season dashboard</h3>
+<p>Operations opens the Season tab to follow a live product phase by phase. Settlement uses the same code path as pricing, run over the live season's rainfall.</p>
+<h3>13.2 Phase states</h3>
+<ul>
+  <li>upcoming — the stage window has not finished. No index or payout is shown.</li>
+  <li>provisional — the window has finished but the final data has not settled. A figure is shown, labelled provisional, and is not paid on.</li>
+  <li>settled — the final data is available. The figure is safe to pay.</li>
+</ul>
+<h3>13.3 Final-data date</h3>
+<p>CHIRPS publishes final data about three weeks after each month ends. A phase becomes settleable on:</p>
+<div class="mathblock">\[
+\text{final\_ready} = \text{month\_end}\big(\text{last day of } W\big) + \text{lag\_days}
+\]</div>
+<p>The default \(\text{lag\_days}\) is 21. A product can override it. The lag is printed into the product terms.</p>
+<h3>13.4 Persistence</h3>
+<p>Only settled phases are written to the settlement record. The record is unique per product, season, zone, and phase, and it does not overwrite. The first final computation stands. A scheduled sweep refreshes the season's rainfall so newly published final days are picked up.</p>
+
+<h2 id="s14">14. Payout run</h2>
+<h3>14.1 Readiness</h3>
+<p>A payout run is ready only when every phase of every zone that holds policies is settled. Until then, the screen lists the pending zones.</p>
+<h3>14.2 Building the run</h3>
+<p>The platform builds a review without saving: totals, the count of farmers being paid against the count bound, a per-zone table, and the five largest individual payments. Only active policies are paid.</p>
+<h3>14.3 Per-farmer amount</h3>
+<p>Every farmer in a zone shares one index and one rate. The zone rate is the zone's total settled payout divided by the product's sum insured, and each farmer's amount is that rate times their own sum insured:</p>
+<div class="mathblock">\[
+\text{zone\_rate} = \frac{\text{zone settled payout total}}{\text{product } SI},
+\qquad
+\text{farmer amount} = \text{zone\_rate} \times SI_{\text{farmer}}
+\]</div>
+<h3>14.4 Anomaly check</h3>
+<p>A zone is flagged when its settled payout exceeds 3 times the expected loss it was priced at. The flag is advisory; it prompts a review before release and does not block it.</p>
+<div class="mathblock">\[
+\text{flag zone if} \quad \text{zone settled payout total} \;>\; 3 \times EL_{\text{zone}}
+\]</div>
+<h3>14.5 Release</h3>
+<p>Release is a one-way lock and asks for confirmation twice. On release, the platform writes an immutable run record and one line per paid farmer, and sets every active policy in the season to settled. A season is closed once, and a farmer is paid once per run. The action is written to the audit trail. The payout file has fixed columns and a fixed order:</p>
+<pre><code>policy_number, phone, zone, amount, evidence_reference</code></pre>
+<p>The phone is decrypted only into this outbound file. The money is recorded, not moved; the file is sent to the existing payment rails.</p>
+
+<h2 id="s15">15. Operations (demand signals)</h2>
+<p>The Operations tab is a read-only view of demand signals: the cases where an agent requested cover the platform could not quote. Reasons are <code>no_product</code> (no product for that country, crop, and season) and <code>outside_coverage</code> (the point fell outside the mapped area). This shows where cover was requested but did not exist.</p>
+
+<h2 id="s16">16. Users</h2>
+<p>The Users tab is admin-only. It creates accounts and assigns a role (admin, actuary, agronomist, operations, agent). Roles gate the screens and the API. Admin is a superuser. The last active admin cannot be deactivated or demoted.</p>
+
+<h2 id="s17">17. Open standards and open source</h2>
+<p>Mainstay uses open data, open formats, and open-source software throughout.</p>
+<p><strong>Open data.</strong> Rainfall comes from CHIRPS, a public dataset published by the Climate Hazards Center at UC Santa Barbara. The exact files used can be re-downloaded from the public source.</p>
+<p><strong>Open formats.</strong> GeoTIFF for the rainfall raster; GeoJSON for zone polygons; compressed NumPy arrays (.npz) for cached rainfall; JSON for provenance and audit records; ISO 3166 three-letter codes for countries.</p>
+<p><strong>Open-source stack.</strong> Python with FastAPI (backend); NumPy and SciPy (numerics and distribution fitting); scikit-learn (k-means clustering); shapely and rasterio (spatial operations); PostgreSQL with PostGIS (database); Celery with Redis (background jobs); React with MapLibre (frontend and map), with OpenFreeMap tiles.</p>
+<p><strong>Open cryptography.</strong> PBKDF2-HMAC-SHA256 for password hashing; Fernet (AES-128-CBC with HMAC) for farmer PII.</p>
+<p><strong>Reproducibility.</strong> The input is public, the code is open, and the random steps use fixed seeds. The same rainfall and settings produce the same zones, and the same history and seed produce the same price. A result can be re-run and checked. The full stack self-hosts with <code>docker compose up</code>.</p>
+
+<h2 id="s18">18. Limitations</h2>
+<p><strong>Basis risk.</strong> The index follows a rainfall grid, not an individual field. It can pay when little was lost and can miss a real loss. The zoning homogeneity score measures this, and the policy document states it.</p>
+<p><strong>Short history.</strong> A small number of years can understate the frequency and size of rare events. The data-quality flag warns when history is thin; green requires 15 years.</p>
+<p><strong>CHIRPS resolution.</strong> CHIRPS is a satellite-and-gauge estimate at about 5.5 km. It is an estimate, not a gauge in every field, and leans more on satellite where ground gauges are sparse.</p>
+<p><strong>Legal wording.</strong> The policy document carries placeholder terms. It is not legal advice and must be completed and approved by the insurer's counsel and regulator before commercial use.</p>
+<p><strong>Key custody.</strong> Farmer PII is protected only while the encryption key is kept secret. In production, the host must generate and hold the key. The development fallback key must not be used.</p>
+<p><strong>Version 1 scope.</strong> Fixed-calendar phase windows; one payment per farmer at season end; no detrending of the rainfall history; no tail loading factors; no separate checker before publishing. These are documented choices.</p>
+<p><strong>Recommended validation.</strong> Run a known drought season through the zones and triggers and confirm the payouts fall where the losses occurred (a back-test). This is the strongest check before relying on a rate commercially.</p>
+
+<h2 id="s19">19. Symbol reference</h2>
+<table>
+  <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>\(R_d\)</td><td>rainfall on day \(d\) (mm)</td></tr>
+    <tr><td>\(I\)</td><td>phase index (mm for deficit/excess, days for dry spell)</td></tr>
+    <tr><td>\(S,\ E\)</td><td>strike and exit</td></tr>
+    <tr><td>\(L\)</td><td>phase limit (money at risk in a phase)</td></tr>
+    <tr><td>\(f\)</td><td>payout fraction (0 to 1)</td></tr>
+    <tr><td>\(SI\)</td><td>sum insured</td></tr>
+    <tr><td>\(w_i\)</td><td>sensitivity weight of stage \(i\)</td></tr>
+    <tr><td>\(n\)</td><td>number of years of history</td></tr>
+    <tr><td>\(x_t\)</td><td>total payout in year \(t\)</td></tr>
+    <tr><td>\(BC\)</td><td>burning cost</td></tr>
+    <tr><td>\(p\)</td><td>payout frequency</td></tr>
+    <tr><td>\(Y\)</td><td>fitted severity distribution</td></tr>
+    <tr><td>\(N\)</td><td>number of simulation runs (20,000)</td></tr>
+    <tr><td>\(EL\)</td><td>technical expected loss</td></tr>
+    <tr><td>\(G\)</td><td>gross premium</td></tr>
+    <tr><td>\(g\)</td><td>sum of percent-of-gross loading fractions</td></tr>
+    <tr><td>\(\text{rate}\)</td><td>premium rate (percent of sum insured)</td></tr>
+  </tbody>
+</table>
+
+<h2 id="s20">20. Glossary</h2>
+<p><strong>Basis risk.</strong> The difference between what the index measures and what a farmer actually lost.<br>
+<strong>Burning cost.</strong> The mean of the historical annual payouts.<br>
+<strong>CHIRPS.</strong> The public rainfall dataset used, from UC Santa Barbara.<br>
+<strong>Cover type.</strong> Deficit (too little rain), excess (too much rain), or dry spell (a long run of dry days).<br>
+<strong>Expected loss.</strong> The average cost of the risk. The technical expected loss is the larger of the burning cost and the modelled figure.<br>
+<strong>Homogeneity.</strong> The mean correlation of a zone's cells with the zone mean.<br>
+<strong>Loading.</strong> An amount added to the expected loss to reach a premium (margin, admin, commission, profit).<br>
+<strong>Master policy and schedule.</strong> A master policy over a list of one or more farmers.<br>
+<strong>Provisional and settled.</strong> A provisional figure uses preliminary rainfall and is not paid on; a settled figure uses final rainfall and is paid.<br>
+<strong>Strike and exit.</strong> The two payout lines. Payout is 0 at the strike and equals the phase limit at the exit.<br>
+<strong>Sum insured.</strong> The cover amount.<br>
+<strong>Zone map.</strong> The grouping of a country into zones, one per country, frozen as a named version.</p>
+
+<h2 id="s21">21. Appendix: running and deploying</h2>
+<p>Run the full stack locally (requires Docker):</p>
+<pre><code>docker compose up</code></pre>
+<p>The API is at <code>http://localhost:8000</code> (health check at <code>/health</code>). The three status indicators show the API, database, and worker.</p>
+<p>Deploy online with Render, from the blueprint file. The app redeploys on every push to <code>main</code>. On first setup, connect the repository, let Render create the database, cache, backend, and frontend, then set the frontend's API URL and the API's allowed origins. After that, a push is a deploy.</p>
+<p>The environment secret that matters most in production is <code>AEZ_PII_KEY</code>, which encrypts farmer PII. The host must generate and hold a strong value. The development fallback must not be used.</p>
+
+<h2 id="s22">22. Disclaimer and licence</h2>
+<div class="callout">
+<strong>No warranty on accuracy</strong>
+This software and this manual are provided "as is", without warranty of any kind, express or implied. No guarantee is given about the accuracy, reliability, or completeness of the models, formulas, zone maps, prices, expected losses, payouts, or any other output. The authors and contributors accept no legal responsibility or liability for any loss or damage arising from use of the software or from reliance on its output.
+</div>
+<div class="callout">
+<strong>Not financial or actuarial advice</strong>
+The outputs of this platform, including prices, rates, expected losses, and payouts, are not financial advice, insurance advice, actuarial certification, or a recommendation to buy or sell any product. They are a computational tool. They must be independently reviewed and approved by a qualified actuary, the insurer's legal counsel, and the relevant regulator before any commercial use. Any decision made using this software is the sole responsibility of the user.
+</div>
+<div class="callout">
+<strong>Free to use, no licence required</strong>
+This software and this manual may be used, copied, modified, and distributed freely by anyone, for any purpose, including commercial use, without a commercial licence, without a fee, and without seeking permission. No rights are reserved that would restrict this use.
+</div>
+
+<footer>
+Mainstay user manual. Formulas rendered with MathJax. This document is provided under the terms in section 22.
+</footer>
+
+</div>
+</body>
+</html>
