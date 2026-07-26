@@ -185,6 +185,28 @@ export default function ProductDesign() {
     setPhases(phases.map((p) => ({ ...p, limit: Math.round((Number(p.limit) / total) * si * 100) / 100 })))
   }
 
+  // "Cover these stages only": tick a stage off to drop its cover (limit -> 0),
+  // and the remaining stages rebalance to the full sum insured. Ticking one back
+  // on restores its original proposed share. Zeroed stages carry no premium, so
+  // this is how you build a cheaper flowering-only (or germination-only) variant.
+  const toggleStage = (i) => {
+    const si = openDraft?.definition?.sum_insured || 0
+    const next = phases.map((p) => ({ ...p }))
+    if (Number(next[i].limit) > 0) {
+      next[i].limit = 0
+    } else {
+      const original = openDraft?.definition?.zones?.[zone]?.phases?.[i]?.limit
+      const nowCovered = next.filter((p, j) => j === i || Number(p.limit) > 0).length
+      next[i].limit = original && original > 0 ? original : (si / (nowCovered || 1))
+    }
+    const total = next.reduce((s, p) => s + Number(p.limit || 0), 0)
+    setPhases(
+      total && si
+        ? next.map((p) => ({ ...p, limit: Number(p.limit) > 0 ? Math.round((Number(p.limit) / total) * si * 100) / 100 : 0 }))
+        : next,
+    )
+  }
+
   // Phases sent to the backend carry the current trigger mode so it resolves
   // percentages against each phase's stored reference (normal).
   const phasesForPricing = () => phases.map((p) => ({ ...p, trigger_mode: mode }))
@@ -314,8 +336,13 @@ export default function ProductDesign() {
             </thead>
             <tbody>
               {phases.map((p, i) => (
-                <tr key={i}>
-                  <td>{p.name}</td>
+                <tr key={i} style={{ opacity: Number(p.limit) > 0 ? 1 : 0.5 }}>
+                  <td>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <input type="checkbox" checked={Number(p.limit) > 0} onChange={() => toggleStage(i)} title="cover this stage" />
+                      {p.name}
+                    </label>
+                  </td>
                   <td>
                     <select value={p.cover_type} onChange={(e) => editPhase(i, 'cover_type', e.target.value)}>
                       <option value="deficit">deficit</option>
@@ -362,6 +389,7 @@ export default function ProductDesign() {
               </p>
             )
           })()}
+          <p className="hint-note">Untick a stage to drop its cover and rebalance onto the rest — that’s how you build a cheaper single-stage variant.</p>
           <button onClick={() => price(openDraft.id, zone, phases)} disabled={computing}>
             {computing ? 'Computing…' : 'Recompute payouts'}
           </button>
