@@ -203,3 +203,15 @@ def test_assumption_sheet_lists_dataset_and_method(env):
     assert "CHIRPS" in body
     assert "max(burning cost, modelled EL)" in body
     assert "Assumption Sheet" in body
+
+
+def test_publish_rejects_unbalanced_stage_split(env):
+    """The stage limits are the split of the sum insured; they must add up to it."""
+    client, draft_id, definition = env
+    zones = definition["zones"]
+    phases = [dict(p) for p in (zones.get(1) or zones.get("1"))["phases"]]
+    for p in phases:
+        p["limit"] = 100.0   # four stages summing to 400, not the 10 000 sum insured
+    r = _publish(client, draft_id, zone_phases={"1": phases})
+    assert r.status_code == 400
+    assert "sum insured" in r.json()["detail"].lower()

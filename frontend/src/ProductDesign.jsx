@@ -176,6 +176,15 @@ export default function ProductDesign() {
     setPhases(p)
   }
 
+  // Scale the stage limits so they add up exactly to the sum insured, keeping
+  // the actuary's chosen proportions.
+  const balanceLimits = () => {
+    const si = openDraft?.definition?.sum_insured
+    const total = phases.reduce((s, p) => s + Number(p.limit || 0), 0)
+    if (!si || !total) return
+    setPhases(phases.map((p) => ({ ...p, limit: Math.round((Number(p.limit) / total) * si * 100) / 100 })))
+  }
+
   // Phases sent to the backend carry the current trigger mode so it resolves
   // percentages against each phase's stored reference (normal).
   const phasesForPricing = () => phases.map((p) => ({ ...p, trigger_mode: mode }))
@@ -332,11 +341,27 @@ export default function ProductDesign() {
                       <td><input type="number" value={p.exit} onChange={(e) => editPhase(i, 'exit', e.target.value)} /></td>
                     </>
                   )}
-                  <td><input type="number" value={p.limit} onChange={(e) => editPhase(i, 'limit', e.target.value)} /></td>
+                  <td>
+                    <input type="number" value={p.limit} onChange={(e) => editPhase(i, 'limit', e.target.value)} />
+                    {openDraft.definition.sum_insured
+                      ? <span className="hint">{Math.round((Number(p.limit) / openDraft.definition.sum_insured) * 100)}%</span>
+                      : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {(() => {
+            const si = openDraft.definition.sum_insured
+            const total = phases.reduce((s, p) => s + Number(p.limit || 0), 0)
+            const off = si && Math.abs(total - si) > Math.max(1, 0.005 * si)
+            return (
+              <p className="hint-note" style={{ fontStyle: 'normal', color: off ? '#b45309' : 'var(--text-muted)' }}>
+                Cover split across stages: <strong>{Math.round(total).toLocaleString()}</strong> of {Number(si).toLocaleString()} sum insured.
+                {off ? <> The stages don’t add up — <button className="secondary" style={{ marginLeft: '0.35rem', padding: '0.1rem 0.5rem' }} onClick={balanceLimits}>Balance to sum insured</button></> : ' ✓'}
+              </p>
+            )
+          })()}
           <button onClick={() => price(openDraft.id, zone, phases)} disabled={computing}>
             {computing ? 'Computing…' : 'Recompute payouts'}
           </button>

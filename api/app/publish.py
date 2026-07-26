@@ -168,6 +168,15 @@ def publish_product(store, draft_id: str, distribution: str, loadings: list[dict
     for zid_str, zdef in definition["zones"].items():
         zone = int(zid_str)
         phases = zone_phases.get(zid_str) or zone_phases.get(zone) or zdef["phases"]
+        # The stage limits are the split of the sum insured across phases; they
+        # must add up to it, or a farmer could be paid more (or less) than their
+        # cover. Tolerate rounding, catch a genuinely unbalanced split.
+        limit_total = sum(float(p.get("limit", 0) or 0) for p in phases)
+        if abs(limit_total - sum_insured) > max(1.0, 0.005 * sum_insured):
+            failures.append(
+                f"Zone {zone}: stage limits sum to {limit_total:,.0f}, not the "
+                f"{sum_insured:,.0f} sum insured — rebalance the split")
+            continue
         try:
             econ = compute_zone_economics(
                 store, country, zone_geojson, years, definition["plant_start"],
