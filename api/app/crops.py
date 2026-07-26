@@ -66,6 +66,167 @@ MAIZE_SEED = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Comprehensive FAO-typical crop library
+#
+# Every crop keeps the four canonical stage names (establishment / vegetative /
+# flowering / grain_filling) so the cover-type defaults stay sensible
+# (establishment + flowering default to dry-spell, the rest to deficit) and the
+# workbench UI is uniform. Only the stage *durations* and *sensitivity weights*
+# change per crop — durations from FAO-56 growth-stage lengths, weights from the
+# FAO-33 yield-response pattern (flowering/reproductive is the most water-stress
+# -sensitive stage). Sensitivity weights sum to 1.0.
+#
+# Planting windows are FAO GIEWS Country-Crop-Calendar *regional typicals*: the
+# broad sowing month per agro-climatic zone, not a district-precise date. Every
+# record is seeded reviewed=False on purpose — an agronomist must confirm the
+# stage numbers and the exact local sowing window before a product relies on it.
+#
+# The season enum is only long_rains / short_rains, so each country's main
+# season maps to long_rains and (in the bimodal East African belt) the second
+# season maps to short_rains.
+# ---------------------------------------------------------------------------
+
+_LIBRARY_SOURCE = (
+    "FAO GIEWS Country Crop Calendar; FAO Irrigation & Drainage Paper 33/56 "
+    "— FAO-typical values, pending agronomist review"
+)
+
+
+def _stages(est, veg, flr, grn, sens):
+    """Four canonical stages from (days...) and a (sensitivity...) tuple."""
+    names = ("establishment", "vegetative", "flowering", "grain_filling")
+    return [
+        {"name": n, "days": d, "sensitivity": s}
+        for n, d, s in zip(names, (est, veg, flr, grn), sens)
+    ]
+
+
+def _win(country, season, start, end):
+    return {"country": country, "season": season, "plant_start": start, "plant_end": end}
+
+
+# Regional planting-window builders (sowing month range, MM-DD). A country's
+# main rainy season is long_rains; the bimodal East-African second season is
+# short_rains.
+def _east_lr(cs):   return [_win(c, "long_rains", "03-01", "04-15") for c in cs]
+def _east_sr(cs):   return [_win(c, "short_rains", "10-01", "11-15") for c in cs]
+def _eth_lr():      return [_win("ETH", "long_rains", "06-01", "07-15")]  # Meher
+def _southern(cs):  return [_win(c, "long_rains", "11-15", "12-31") for c in cs]
+def _sahel(cs):     return [_win(c, "long_rains", "06-15", "07-15") for c in cs]
+def _west(cs):      return [_win(c, "long_rains", "05-15", "06-30") for c in cs]
+
+
+CROP_LIBRARY = [
+    {
+        "crop": "sorghum",
+        "stages": _stages(20, 40, 25, 35, (0.15, 0.20, 0.35, 0.30)),
+        "seasons": (
+            _east_lr(["KEN", "TZA", "UGA"]) + _eth_lr()
+            + _sahel(["SEN", "MLI", "BFA", "NER"]) + _west(["NGA", "GHA"])
+            + _southern(["ZMB", "MWI", "ZWE", "MOZ"])
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "pearl_millet",
+        "stages": _stages(15, 30, 20, 25, (0.15, 0.20, 0.35, 0.30)),
+        "seasons": (
+            _sahel(["SEN", "MLI", "BFA", "NER"]) + _west(["NGA"])
+            + _east_lr(["KEN", "TZA"]) + _eth_lr()
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "finger_millet",
+        "stages": _stages(20, 35, 25, 30, (0.15, 0.20, 0.35, 0.30)),
+        "seasons": (
+            _east_lr(["UGA", "KEN", "TZA"]) + _eth_lr()
+            + _southern(["ZMB", "MWI", "ZWE"])
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "rice",
+        "stages": _stages(25, 45, 30, 30, (0.15, 0.20, 0.35, 0.30)),
+        "seasons": (
+            _west(["NGA", "GHA"]) + _sahel(["SEN", "MLI"])
+            + _east_lr(["TZA", "UGA"]) + _southern(["MOZ", "MWI"])
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "groundnut",
+        "stages": _stages(20, 40, 35, 25, (0.15, 0.25, 0.35, 0.25)),
+        "seasons": (
+            _sahel(["SEN", "MLI", "BFA", "NER"]) + _west(["NGA", "GHA"])
+            + _east_lr(["KEN", "TZA", "UGA"]) + _eth_lr()
+            + _southern(["ZMB", "MWI", "ZWE", "MOZ"])
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "cowpea",
+        "stages": _stages(15, 30, 20, 15, (0.15, 0.25, 0.35, 0.25)),
+        "seasons": (
+            _west(["NGA", "GHA"]) + _sahel(["SEN", "MLI", "BFA", "NER"])
+            + _east_lr(["KEN", "TZA", "UGA"]) + _east_sr(["KEN", "TZA", "UGA"])
+            + _southern(["MOZ", "MWI"])
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "common_bean",
+        "stages": _stages(15, 30, 25, 25, (0.15, 0.20, 0.40, 0.25)),
+        "seasons": (
+            _east_lr(["KEN", "UGA", "RWA", "TZA"]) + _east_sr(["KEN", "UGA", "RWA", "TZA"])
+            + _eth_lr() + _southern(["ZMB", "MWI", "ZWE", "MOZ"])
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "soybean",
+        "stages": _stages(20, 40, 35, 25, (0.15, 0.20, 0.40, 0.25)),
+        "seasons": (
+            _southern(["ZMB", "MWI", "ZWE", "MOZ"]) + _west(["NGA", "GHA"])
+            + _east_lr(["UGA"]) + _eth_lr()
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "sunflower",
+        "stages": _stages(20, 35, 30, 25, (0.15, 0.20, 0.40, 0.25)),
+        "seasons": (
+            _east_lr(["TZA", "UGA", "KEN"]) + _southern(["ZMB", "ZWE", "MWI"])
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "wheat",
+        "stages": _stages(20, 40, 25, 35, (0.15, 0.20, 0.35, 0.30)),
+        "seasons": _eth_lr() + _east_lr(["KEN"]),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "cotton",
+        "stages": _stages(25, 45, 50, 40, (0.10, 0.25, 0.40, 0.25)),
+        "seasons": (
+            _east_lr(["TZA"]) + _sahel(["MLI", "BFA", "SEN"]) + _west(["NGA"])
+            + _southern(["ZMB", "ZWE", "MOZ"]) + _eth_lr()
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+    {
+        "crop": "sesame",
+        "stages": _stages(20, 35, 25, 20, (0.15, 0.25, 0.35, 0.25)),
+        "seasons": (
+            _eth_lr() + _east_lr(["TZA", "UGA"]) + _west(["NGA"]) + _southern(["MOZ"])
+        ),
+        "source": _LIBRARY_SOURCE,
+    },
+]
+
+
 def init_schema() -> None:
     with connect() as conn:
         conn.execute(SCHEMA)
@@ -167,4 +328,25 @@ def seed_if_empty() -> None:
             edited_by="system-seed",
             source=MAIZE_SEED["source"],
             reviewed=False,
+        )
+
+
+def seed_library() -> None:
+    """Idempotently add every crop in CROP_LIBRARY that isn't already present.
+
+    Additive and safe on a live database: a crop that already has *any* version
+    (including agronomist edits) is left completely untouched — we only ever
+    create version 1 of a crop the library has and the database doesn't. This is
+    what lets a deploy backfill the new crops without clobbering existing ones.
+    """
+    with connect() as conn:
+        existing = {
+            r[0] for r in conn.execute("SELECT DISTINCT crop FROM crop_versions").fetchall()
+        }
+    for entry in CROP_LIBRARY:
+        if entry["crop"] in existing:
+            continue
+        save_new_version(
+            entry["crop"], entry["stages"], entry["seasons"],
+            edited_by="system-seed", source=entry["source"], reviewed=False,
         )

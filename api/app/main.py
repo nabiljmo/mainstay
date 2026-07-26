@@ -24,6 +24,7 @@ def _bootstrap_schema() -> None:
             init_schema()
             crops.init_schema()
             crops.seed_if_empty()
+            crops.seed_library()
             publish.init_schema()
             quotes.init_schema()
             policies.init_schema()

@@ -26,6 +26,7 @@ function QQPlot({ qq }) {
 export default function ProductDesign() {
   const [maps, setMaps] = useState([])
   const [crops, setCrops] = useState([])
+  const [countries, setCountries] = useState([])
   const [drafts, setDrafts] = useState([])
   const [form, setForm] = useState({
     zone_map: '', country: 'KEN', crop: 'maize', crop_version: 1, season: 'long_rains',
@@ -50,17 +51,34 @@ export default function ProductDesign() {
   const loadDrafts = () => fetch(`${API}/products/drafts`).then((r) => r.json()).then(setDrafts).catch(() => {})
 
   useEffect(() => {
-    fetch(`${API}/zone-maps?country=KEN`).then((r) => r.json()).then((m) => {
-      setMaps(m)
-      if (m.length) setForm((f) => ({ ...f, zone_map: m[0].name, country: m[0].country || f.country }))
-    })
-    fetch(`${API}/crops`).then((r) => r.json()).then((cs) => {
-      setCrops(cs)
-      if (cs.length) setForm((f) => ({ ...f, crop: cs[0].crop, crop_version: cs[0].version }))
-    })
+    fetch(`${API}/weather/countries`).then((r) => r.json()).then(setCountries).catch(() => {})
+    fetch(`${API}/crops`).then((r) => r.json()).then(setCrops).catch(() => {})
     fetch(`${API}/pricing/defaults`).then((r) => r.json()).then((d) => setLoadings(d.loadings))
     loadDrafts()
   }, [])
+
+  // Zone maps are country-specific — reload them whenever the country changes,
+  // and point the form at the first available map for that country.
+  useEffect(() => {
+    fetch(`${API}/zone-maps?country=${form.country}`).then((r) => r.json()).then((m) => {
+      setMaps(m)
+      setForm((f) => ({ ...f, zone_map: m.length ? m[0].name : '' }))
+    }).catch(() => setMaps([]))
+  }, [form.country])
+
+  // Only crops with a planting window for the chosen country + season can be
+  // drafted; keep the selected crop valid as those change.
+  const availableCrops = crops.filter(
+    (c) => c.seasons?.some((s) => s.country === form.country && s.season === form.season),
+  )
+  useEffect(() => {
+    if (!crops.length) return
+    const stillValid = availableCrops.some((c) => c.crop === form.crop)
+    if (!stillValid) {
+      const first = availableCrops[0]
+      setForm((f) => ({ ...f, crop: first?.crop ?? '', crop_version: first?.version ?? f.crop_version }))
+    }
+  }, [form.country, form.season, crops])
 
   useEffect(() => {
     if (!job?.id || job.state === 'SUCCESS' || job.state === 'FAILURE') return
@@ -219,9 +237,16 @@ export default function ProductDesign() {
     <div className="crop-view">
       <div className="crop-list">
         <h2>New product</h2>
+        <label>Country
+          <select value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })}>
+            {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+          </select>
+        </label>
         <label>Zone map
           <select value={form.zone_map} onChange={(e) => setForm({ ...form, zone_map: e.target.value })}>
-            {maps.map((m) => <option key={m.name} value={m.name}>{m.name} ({m.params.n_clusters}z)</option>)}
+            {maps.length
+              ? maps.map((m) => <option key={m.name} value={m.name}>{m.name} ({m.params.n_clusters}z)</option>)
+              : <option value="">No approved zone map for this country</option>}
           </select>
         </label>
         <label>Crop
@@ -229,7 +254,9 @@ export default function ProductDesign() {
             const c = crops.find((x) => x.crop === e.target.value)
             setForm({ ...form, crop: e.target.value, crop_version: c?.version ?? form.crop_version })
           }}>
-            {crops.map((c) => <option key={c.crop} value={c.crop}>{c.crop} v{c.version}</option>)}
+            {availableCrops.length
+              ? availableCrops.map((c) => <option key={c.crop} value={c.crop}>{c.crop} v{c.version}</option>)
+              : <option value="">No crop with a window here</option>}
           </select>
         </label>
         <label>Season
@@ -241,9 +268,18 @@ export default function ProductDesign() {
         <label>Sum insured
           <input type="number" value={form.sum_insured} onChange={(e) => setForm({ ...form, sum_insured: +e.target.value })} />
         </label>
-        <button onClick={createDraft} disabled={job && job.state !== 'SUCCESS' && job.state !== 'FAILURE'}>
+        <button
+          onClick={createDraft}
+          disabled={!form.zone_map || !form.crop || (job && job.state !== 'SUCCESS' && job.state !== 'FAILURE')}
+        >
           {job && job.state !== 'SUCCESS' && job.state !== 'FAILURE' ? `Drafting… ${job.progress?.stage ?? ''}` : 'Draft product'}
         </button>
+        {!availableCrops.length && crops.length > 0 && (
+          <p className="hint-note" style={{ fontStyle: 'normal' }}>
+            No crop has a {form.season.replace('_', ' ')} planting window for this country yet —
+            add one in the <strong>Crop Library</strong> tab, then it will appear here.
+          </p>
+        )}
         {error && <div className="error">{error}</div>}
 
         <h3 style={{ marginTop: '1.25rem' }}>Drafts</h3>

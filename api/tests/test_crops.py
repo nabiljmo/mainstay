@@ -93,3 +93,40 @@ def test_maize_seed_is_wellformed():
     # Flowering is the most water-stress-sensitive stage.
     flowering = next(s for s in seed["stages"] if s["name"] == "flowering")
     assert flowering["sensitivity"] == max(s["sensitivity"] for s in seed["stages"])
+
+
+def test_crop_library_is_wellformed():
+    from app import crops
+
+    assert crops.CROP_LIBRARY, "library should not be empty"
+    seen = set()
+    for entry in crops.CROP_LIBRARY:
+        crop = entry["crop"]
+        assert crop not in seen, f"duplicate crop {crop!r} in library"
+        seen.add(crop)
+        # Stage/season data must pass the same validation the UI enforces.
+        assert crops.validate(entry["stages"], entry["seasons"]) == [], crop
+        # Canonical stage names keep the cover-type defaults sensible.
+        assert [s["name"] for s in entry["stages"]] == [
+            "establishment", "vegetative", "flowering", "grain_filling",
+        ], crop
+        # No duplicate country+season windows within a crop.
+        keys = [(s["country"], s["season"]) for s in entry["seasons"]]
+        assert len(keys) == len(set(keys)), f"duplicate window in {crop}"
+
+
+def test_seed_library_is_idempotent(db_or_skip):
+    from app import crops
+    from app.db import connect
+
+    crops.seed_library()
+    crops.seed_library()  # second run must not add duplicate versions
+    with connect() as conn:
+        for entry in crops.CROP_LIBRARY:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM crop_versions WHERE crop = %s", (entry["crop"],)
+            ).fetchone()[0]
+            assert n >= 1
+            # An untouched library crop stays at exactly one version.
+            latest = crops.get_version(entry["crop"], 1)
+            assert latest is not None
